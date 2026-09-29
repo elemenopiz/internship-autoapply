@@ -30,7 +30,7 @@ company allowlist                       5    flat bonus
 =====================================  ====  ==========================================================
 
 Penalties (subtracted; never a hard fail): no internship signal at all -20; the description names only
-other terms -15; clearly non-US location while ``us_only`` -40; location outside a non-empty preferred list
+other terms -25; clearly non-US location while ``us_only`` -40; location outside a non-empty preferred list
 -8 / -15 / -30 (profile willing to relocate: yes / unknown / no); remote-only role while ``remote_ok`` is
 off -15.
 
@@ -55,6 +55,7 @@ import unicodedata
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
+from functools import lru_cache
 from typing import Any
 
 from autoapply.models import Opportunity, Profile, RoleFamily, ScoreResult, SearchProfile
@@ -96,7 +97,7 @@ KEYWORD_TITLE_PTS = 4.0
 KEYWORD_DESCRIPTION_PTS = 2.0
 
 PENALTY_NO_INTERNSHIP = 20.0
-PENALTY_DESCRIPTION_TERM = 15.0
+PENALTY_DESCRIPTION_TERM = 25.0
 PENALTY_NON_US = 40.0
 PENALTY_REMOTE_OFF = 15.0
 PENALTY_OFF_PREFERRED_RELOCATE = 8.0
@@ -114,10 +115,13 @@ _PHD_RE = re.compile(r"\bph\.?\s?d\b\.?")
 _COOP_RE = re.compile(r"\bco[\s-]?op\b")
 
 
+_COMBINING_RE = re.compile("[\u0300-\u036f\u1ab0-\u1aff\u1dc0-\u1dff\u20d0-\u20ff\ufe20-\ufe2f]")
+
+
 def _clean(text: str) -> str:
     """Lower-case, strip accents, read ``&`` as "and", fold M.B.A./Ph.D./co-op into single words."""
-    decomposed = unicodedata.normalize("NFKD", text)
-    lowered = "".join(c for c in decomposed if not unicodedata.combining(c)).lower()
+    decomposed = text if text.isascii() else unicodedata.normalize("NFKD", text)
+    lowered = _COMBINING_RE.sub("", decomposed).lower()
     lowered = lowered.replace("&", " and ").replace("’", "'")
     lowered = _PHD_RE.sub("phd", lowered)
     lowered = _DOTTED_RE.sub(lambda m: m.group(0).replace(".", ""), lowered)
@@ -127,6 +131,9 @@ def _clean(text: str) -> str:
 _NO_STEM = frozenset({"seniors"})  # students ("rising seniors"), not the job level "senior"
 
 
+@lru_cache(
+    maxsize=100_000
+)  # the vocabulary of job postings is small; stemming dominates long texts
 def _stem(token: str) -> str:
     """Conservative plural stripping ("analysts" -> "analyst", "strategies" -> "strategy")."""
     if len(token) <= 3 or not token.isalpha() or token in _NO_STEM:
