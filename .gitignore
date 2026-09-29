@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.coverage
+htmlcov/
+
+# Runtime data: contains PII (name, phone, resume) and local state. NEVER commit.
+data/*
+!data/README.md
+!data/.gitkeep
+
+# Agent worktrees / scratch
+.claude/worktrees/
+.claude/scratch/
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
