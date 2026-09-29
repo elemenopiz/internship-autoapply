@@ -1,8 +1,8 @@
 # SPEC — Summer 2027 internship auto-applier
 
 Authoritative build spec. The README describes the product; this file says how it is built and when it is done.
-Contract files (`models.py`, `contracts.py`, `config.py`, `normalize.py`, `clock.py`, `testing/mock_ats/base.py`,
-`tests/conftest.py`, this file, `pyproject.toml`) are owned by the orchestrator: never edit them, report a
+Contract files (`models.py`, `contracts.py`, `config.py`, `normalize.py`, `clock.py`, `apply/matching.py`,
+`testing/mock_ats/base.py`, `tests/conftest.py`, this file, `pyproject.toml`) are owned by the orchestrator: never edit them, report a
 `CONTRACT-REQUEST` instead.
 
 ## 0. Definition of done
@@ -60,7 +60,7 @@ FastAPI dashboard only reads/writes DB+config and enqueues runs. SQLite (WAL, on
 
 ```
 src/autoapply/
-  models.py contracts.py config.py normalize.py clock.py        (contract files)
+  models.py contracts.py config.py normalize.py clock.py apply/matching.py   (contract files)
   db.py secrets.py llm.py readiness.py                          (5.1, 5.2)
   sources/{__init__,workbook,boards,dedupe,linkedin,indeed}.py  (5.3)
   scoring.py                                                    (5.4)
