@@ -7,6 +7,7 @@ public schemas and served through ``httpx.MockTransport`` (or respx in one test)
 from __future__ import annotations
 
 import copy
+import itertools
 import json
 import logging
 import random
@@ -929,6 +930,9 @@ def _lever_ctx(postings: list[dict[str, Any]], **kwargs: Any) -> SourceContext:
     return ctx
 
 
+_POSTING_IDS = itertools.count(1)
+
+
 def _posting(
     title: str, *, department: str = "", team: str = "", commitment: str = ""
 ) -> dict[str, Any]:
@@ -939,7 +943,7 @@ def _posting(
         "location": "Austin, TX",
     }
     return _lv_posting(
-        f"id-{abs(hash(title + department + team + commitment))}",
+        f"id-{next(_POSTING_IDS)}",
         title,
         categories=cats,
         description="",
@@ -1288,7 +1292,7 @@ def test_redirects_are_followed_without_leaking_credentials(location: str) -> No
         assert not {"authorization", "cookie"} & {k.lower() for k in request.headers}
 
 
-def test_redirect_loops_and_odd_schemes_fail_the_token_cleanly() -> None:
+def test_redirect_loops_fail_the_token_cleanly() -> None:
     loop = _routes(
         {"/v0/postings/moved": httpx.Response(302, headers={"Location": "/v0/postings/moved"})}
     )
@@ -1296,11 +1300,48 @@ def test_redirect_loops_and_odd_schemes_fail_the_token_cleanly() -> None:
     errors = LeverProvider().fetch_with_report(ctx).errors
     assert list(errors) == ["moved"] and errors["moved"].startswith("network error")
     assert len(rec.requests) == 4, "the first request plus three redirects, then give up"
-    ftp = _routes(
-        {"/v0/postings/moved": httpx.Response(302, headers={"Location": "ftp://files.test/x"})}
-    )
-    ctx, _ = _ctx(ftp, lever=["moved"])
-    assert "unsupported scheme" in LeverProvider().fetch_with_report(ctx).errors["moved"]
+
+
+@pytest.mark.parametrize(
+    "location",
+    [
+        "ftp://files.test/x",
+        "file:///etc/passwd",
+        "javascript:alert(1)",
+        "https://evil.test/v0/postings/new-home",
+        "http://169.254.169.254/latest/meta-data/",
+        "http://127.0.0.1:8080/admin",
+        "https://api.lever.co.evil.test/v0/postings/new-home",  # suffix trick
+        "https://notlever.co/v0/postings/new-home",
+        "http://api.eu.lever.co/v0/postings/new-home",  # downgrade to http on another host
+    ],
+)
+def test_redirects_to_other_hosts_or_schemes_are_refused_and_never_requested(location: str) -> None:
+    recorder = Recorder(_redirecting(location))
+    ctx, _ = _ctx(recorder, lever=["moved"])
+    errors = LeverProvider().fetch_with_report(ctx).errors
+    assert "refused" in errors["moved"]
+    assert len(recorder.requests) == 1, "the redirect target must not be contacted"
+
+
+# ------------------------------------------------------------------------------------------ response size
+
+
+def test_oversized_responses_are_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(boards, "_MAX_RESPONSE_BYTES", 2_000)
+    big = json.dumps([_lever_at("big", f"j{n}") for n in range(20)]).encode()
+    assert len(big) > 2_000
+    routes = {
+        "/v0/postings/big": httpx.Response(200, content=big),
+        "/v0/postings/declared": httpx.Response(
+            200, content=b"[]", headers={"Content-Length": "999999"}
+        ),
+        "/v0/postings/small": [_lever_at("small", "s1")],
+    }
+    ctx, _ = _ctx(_routes(routes), lever=["big", "declared", "small"])
+    report = LeverProvider().fetch_with_report(ctx)
+    assert [o.extra["job_id"] for o in report.opportunities] == ["s1"]
+    assert "too large" in report.errors["big"] and "too large" in report.errors["declared"]
 
 
 def test_an_injected_client_is_shared_and_left_open() -> None:

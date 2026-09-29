@@ -33,6 +33,7 @@ Behaviour that matters to callers:
 from __future__ import annotations
 
 import html
+import json
 import logging
 import re
 import warnings
@@ -59,7 +60,11 @@ __all__ = [
     "BoardFetchReport",
     "GreenhouseProvider",
     "LeverProvider",
+    "RawPosting",
     "html_to_text",
+    "parse_ashby_jobs",
+    "parse_greenhouse_jobs",
+    "parse_lever_postings",
     "prettify_token",
 ]
 
@@ -225,15 +230,42 @@ def _new_client() -> httpx.Client:
 
 
 _MAX_REDIRECTS = 3
+_MAX_RESPONSE_BYTES = 25 * 1024 * 1024
+_REDIRECT_SUFFIXES = ("greenhouse.io", "lever.co", "ashbyhq.com")
+
+
+def _redirect_allowed(origin: httpx.URL, target: httpx.URL) -> bool:
+    """Redirects stay on the same host or move within the three ATS domains (https only)."""
+    if target.scheme not in {"http", "https"} or not target.host:
+        return False
+    if target.host == origin.host:
+        return True
+    return target.scheme == "https" and any(
+        target.host == suffix or target.host.endswith(f".{suffix}") for suffix in _REDIRECT_SUFFIXES
+    )
+
+
+def _decode_json(response: httpx.Response) -> Any:
+    """Decode the body as JSON, refusing anything larger than ``_MAX_RESPONSE_BYTES``."""
+    declared = response.headers.get("content-length", "")
+    if declared.isascii() and declared.isdigit() and int(declared) > _MAX_RESPONSE_BYTES:
+        raise ValueError("response too large")
+    body = bytearray()
+    for chunk in response.iter_bytes():
+        body.extend(chunk)
+        if len(body) > _MAX_RESPONSE_BYTES:
+            raise ValueError("response too large")
+    return json.loads(bytes(body))
 
 
 def _get_json(client: httpx.Client, url: str, params: Mapping[str, str] | None = None) -> Any:
     """GET ``url`` and decode JSON. Raises ``httpx.HTTPError`` (status, timeout, transport) or
-    ``ValueError`` (invalid JSON).
+    ``ValueError`` (invalid JSON, oversized body, refused redirect).
 
     Credentials configured on the shared client (auth, ``Authorization`` / ``Cookie`` headers, cookie jar) are
-    never sent: they are stripped from every request, and redirects (at most three, http(s) only) are followed
-    here rather than by httpx because httpx re-adds the client's cookies to redirected requests.
+    never sent: they are stripped from every request. Redirects (at most three, same host or within the ATS
+    domains) are followed here rather than by httpx because httpx re-adds the client's cookies to redirected
+    requests.
     """
     target: str | httpx.URL = url
     query = params
@@ -248,14 +280,24 @@ def _get_json(client: httpx.Client, url: str, params: Mapping[str, str] | None =
         )
         for name in _CREDENTIAL_HEADERS:
             request.headers.pop(name, None)
-        response = client.send(request, auth=None, follow_redirects=False)
-        if not (response.is_redirect and response.headers.get("location")):
+        try:
+            response = client.send(request, auth=None, follow_redirects=False, stream=True)
+        except httpx.InvalidURL as exc:  # httpx parses the Location header even when not following
+            raise ValueError("redirect to an invalid URL refused") from exc
+        try:
+            if response.is_redirect and response.headers.get("location"):
+                try:
+                    target = request.url.join(response.headers["location"])
+                except httpx.InvalidURL as exc:
+                    raise ValueError("redirect to an invalid URL refused") from exc
+                if not _redirect_allowed(request.url, target):
+                    raise ValueError(f"redirect to {target.host or target.scheme!r} refused")
+                query = None
+                continue
             response.raise_for_status()
-            return response.json()
-        target = request.url.join(response.headers["location"])
-        query = None
-        if target.scheme not in {"http", "https"}:
-            raise ValueError(f"redirect to unsupported scheme {target.scheme!r}")
+            return _decode_json(response)
+        finally:
+            response.close()
     raise httpx.TooManyRedirects("too many redirects", request=request)
 
 
@@ -276,7 +318,7 @@ def _describe(exc: BaseException) -> str:
 
 
 @dataclass
-class _Raw:
+class RawPosting:
     """One posting in the common shape shared by the three platform parsers."""
 
     job_id: str
@@ -293,9 +335,11 @@ class _Raw:
     extra: dict[str, Any] = field(default_factory=dict)  # platform specifics, JSON-serialisable
 
 
-def _collect(records: list[Any], parse: Callable[[Any], _Raw | None], platform: str) -> list[_Raw]:
+def _collect(
+    records: list[Any], parse: Callable[[Any], RawPosting | None], platform: str
+) -> list[RawPosting]:
     """Parse every record; a malformed one is skipped (debug log), never fatal."""
-    parsed: list[_Raw] = []
+    parsed: list[RawPosting] = []
     for record in records:
         try:
             raw = parse(record)
@@ -360,7 +404,7 @@ def _greenhouse_employment_type(metadata: object) -> str:
     return ""
 
 
-def _greenhouse_job(job: Any, token: str) -> _Raw | None:
+def _greenhouse_job(job: Any, token: str) -> RawPosting | None:
     if not isinstance(job, dict):
         return None
     job_id, title = _text(job.get("id")), _text(job.get("title"))
@@ -384,7 +428,7 @@ def _greenhouse_job(job: Any, token: str) -> _Raw | None:
         )
     departments = _names(job.get("departments"))
     employment = _greenhouse_employment_type(job.get("metadata"))
-    return _Raw(
+    return RawPosting(
         job_id=job_id,
         title=title,
         url=url,
@@ -407,7 +451,7 @@ def _greenhouse_job(job: Any, token: str) -> _Raw | None:
     )
 
 
-def parse_greenhouse_jobs(payload: Any, token: str) -> list[_Raw]:
+def parse_greenhouse_jobs(payload: Any, token: str) -> list[RawPosting]:
     """Postings of a Greenhouse ``/jobs?content=true`` response. Raises ``ValueError`` on a wrong shape."""
     jobs = payload.get("jobs") if isinstance(payload, dict) else None
     if not isinstance(jobs, list):
@@ -430,7 +474,7 @@ def _lever_description(posting: dict[str, Any]) -> str:
     return "\n\n".join(p for p in parts if p)[:MAX_DESCRIPTION_CHARS]
 
 
-def _lever_posting(posting: Any, token: str) -> _Raw | None:
+def _lever_posting(posting: Any, token: str) -> RawPosting | None:
     if not isinstance(posting, dict):
         return None
     job_id, title = _text(posting.get("id")), _first(posting.get("text"), posting.get("title"))
@@ -444,7 +488,7 @@ def _lever_posting(posting: Any, token: str) -> _Raw | None:
     cats = _as_dict(posting.get("categories"))
     location = _text(cats.get("location")) or ", ".join(_names(cats.get("allLocations")))
     remote = _text(posting.get("workplaceType")).lower() == "remote"
-    return _Raw(
+    return RawPosting(
         job_id=job_id,
         title=title,
         url=url,
@@ -465,7 +509,7 @@ def _lever_posting(posting: Any, token: str) -> _Raw | None:
     )
 
 
-def parse_lever_postings(payload: Any, token: str) -> list[_Raw]:
+def parse_lever_postings(payload: Any, token: str) -> list[RawPosting]:
     """Postings of a Lever ``?mode=json`` response (a bare array). Raises ``ValueError`` on a wrong shape."""
     if isinstance(payload, dict) and isinstance(payload.get("data"), list):
         payload = payload["data"]  # tolerate the paginated envelope
@@ -486,7 +530,7 @@ def _ashby_location(job: dict[str, Any]) -> str:
     return "; ".join(dict.fromkeys(p for p in parts if p))
 
 
-def _ashby_job(job: Any, token: str) -> _Raw | None:
+def _ashby_job(job: Any, token: str) -> RawPosting | None:
     if not isinstance(job, dict) or job.get("isListed") is False:
         return None
     job_id, title = _text(job.get("id")), _text(job.get("title"))
@@ -504,7 +548,7 @@ def _ashby_job(job: Any, token: str) -> _Raw | None:
         if isinstance(comp, dict)
         else ""
     )
-    return _Raw(
+    return RawPosting(
         job_id=job_id,
         title=title,
         url=url,
@@ -527,7 +571,7 @@ def _ashby_job(job: Any, token: str) -> _Raw | None:
     )
 
 
-def parse_ashby_jobs(payload: Any, token: str) -> list[_Raw]:
+def parse_ashby_jobs(payload: Any, token: str) -> list[RawPosting]:
     """Postings of an Ashby job-board response. Unlisted postings are skipped. Raises ``ValueError`` on a
     wrong shape."""
     jobs = payload.get("jobs") if isinstance(payload, dict) else None
@@ -539,7 +583,7 @@ def parse_ashby_jobs(payload: Any, token: str) -> list[_Raw]:
 # --------------------------------------------------------------------------------------------- selection
 
 
-def _is_internship(raw: _Raw) -> bool:
+def _is_internship(raw: RawPosting) -> bool:
     """Title, department, team or employment type says intern / internship / co-op / summer analyst."""
     return any(
         signals_internship(text)
@@ -547,7 +591,7 @@ def _is_internship(raw: _Raw) -> bool:
     )
 
 
-def _term_verdict(raw: _Raw, search: SearchProfile) -> tuple[bool, str | None]:
+def _term_verdict(raw: RawPosting, search: SearchProfile) -> tuple[bool, str | None]:
     """(keep, term). Keep unless the posting names other terms and never the target term; ``term`` is the
     configured target term when the title or description mentions it, else None."""
     target = parse_target_term(search.target_term)
@@ -564,9 +608,11 @@ def _term_verdict(raw: _Raw, search: SearchProfile) -> tuple[bool, str | None]:
     return False, None
 
 
-def _select(raws: Iterable[_Raw], search: SearchProfile) -> list[tuple[_Raw, str | None]]:
+def _select(
+    raws: Iterable[RawPosting], search: SearchProfile
+) -> list[tuple[RawPosting, str | None]]:
     """Postings that are internships for the target term (or for no stated term), with their term."""
-    selected: list[tuple[_Raw, str | None]] = []
+    selected: list[tuple[RawPosting, str | None]] = []
     for raw in raws:
         if not _is_internship(raw):
             continue
@@ -577,7 +623,7 @@ def _select(raws: Iterable[_Raw], search: SearchProfile) -> list[tuple[_Raw, str
 
 
 def _to_opportunity(
-    raw: _Raw,
+    raw: RawPosting,
     term: str | None,
     *,
     company: str,
@@ -641,7 +687,7 @@ class _BoardProvider:
             self.configured_tokens(config)
         )
 
-    def load(self, client: httpx.Client, token: str) -> list[_Raw]:
+    def load(self, client: httpx.Client, token: str) -> list[RawPosting]:
         raise NotImplementedError
 
     def board_name(self, client: httpx.Client, token: str) -> str:
@@ -723,7 +769,7 @@ class GreenhouseProvider(_BoardProvider):
     source = OpportunitySource.GREENHOUSE
     ats = ATS.GREENHOUSE
 
-    def load(self, client: httpx.Client, token: str) -> list[_Raw]:
+    def load(self, client: httpx.Client, token: str) -> list[RawPosting]:
         url = f"{GREENHOUSE_API}/{quote(token, safe='')}/jobs"
         return parse_greenhouse_jobs(_get_json(client, url, {"content": "true"}), token)
 
@@ -741,7 +787,7 @@ class LeverProvider(_BoardProvider):
     source = OpportunitySource.LEVER
     ats = ATS.LEVER
 
-    def load(self, client: httpx.Client, token: str) -> list[_Raw]:
+    def load(self, client: httpx.Client, token: str) -> list[RawPosting]:
         url = f"{LEVER_API}/{quote(token, safe='')}"
         return parse_lever_postings(_get_json(client, url, {"mode": "json"}), token)
 
@@ -751,7 +797,7 @@ class AshbyProvider(_BoardProvider):
     source = OpportunitySource.ASHBY
     ats = ATS.ASHBY
 
-    def load(self, client: httpx.Client, token: str) -> list[_Raw]:
+    def load(self, client: httpx.Client, token: str) -> list[RawPosting]:
         url = f"{ASHBY_API}/{quote(token, safe='')}"
         return parse_ashby_jobs(_get_json(client, url, {"includeCompensation": "true"}), token)
 

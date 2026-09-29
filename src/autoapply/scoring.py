@@ -347,132 +347,32 @@ _STATE_PHRASES: tuple[tuple[str, ...], ...] = tuple(
 _US_WORDS = frozenset({"usa", "us", "america"})
 _US_PHRASES: tuple[tuple[str, ...], ...] = (("united", "states"),)
 
+# Places that put a posting outside the United States (lower-case words; matched as whole phrases).
+_NON_US_NAMES = """
+  # countries and regions
+    canada, united kingdom, uk, england, scotland, wales, ireland, india, germany, france,
+    spain, italy, netherlands, belgium, switzerland, austria, sweden, norway, denmark, finland,
+    poland, portugal, czech republic, romania, hungary, greece, turkey, israel,
+    united arab emirates, uae, saudi arabia, egypt, south africa, nigeria, kenya, china,
+    hong kong, taiwan, japan, south korea, korea, singapore, malaysia, indonesia, thailand,
+    vietnam, philippines, australia, new zealand, brazil, argentina, chile, colombia, peru,
+    mexico, costa rica, pakistan, bangladesh, ukraine, emea, apac, latam, europe, asia,
+  # Canadian provinces
+    ontario, quebec, alberta, british columbia, nova scotia, manitoba, saskatchewan,
+  # major cities that are unambiguous on their own
+    london, toronto, vancouver, montreal, ottawa, calgary, dublin, edinburgh, manchester,
+    berlin, munich, paris, madrid, barcelona, amsterdam, zurich, stockholm, oslo, copenhagen,
+    helsinki, warsaw, bangalore, bengaluru, hyderabad, mumbai, pune, delhi, gurgaon, gurugram,
+    chennai, tel aviv, dubai, sydney, melbourne, tokyo, seoul, shanghai, beijing, shenzhen,
+    sao paulo, mexico city, buenos aires, bogota, nairobi, lagos, cairo, johannesburg,
+    cape town,
+"""
 _NON_US_PLACES: tuple[tuple[str, ...], ...] = tuple(
-    tuple(p.split())
-    for p in (
-        # countries and regions
-        "canada",
-        "united kingdom",
-        "uk",
-        "england",
-        "scotland",
-        "wales",
-        "ireland",
-        "india",
-        "germany",
-        "france",
-        "spain",
-        "italy",
-        "netherlands",
-        "belgium",
-        "switzerland",
-        "austria",
-        "sweden",
-        "norway",
-        "denmark",
-        "finland",
-        "poland",
-        "portugal",
-        "czech republic",
-        "romania",
-        "hungary",
-        "greece",
-        "turkey",
-        "israel",
-        "united arab emirates",
-        "uae",
-        "saudi arabia",
-        "egypt",
-        "south africa",
-        "nigeria",
-        "kenya",
-        "china",
-        "hong kong",
-        "taiwan",
-        "japan",
-        "south korea",
-        "korea",
-        "singapore",
-        "malaysia",
-        "indonesia",
-        "thailand",
-        "vietnam",
-        "philippines",
-        "australia",
-        "new zealand",
-        "brazil",
-        "argentina",
-        "chile",
-        "colombia",
-        "peru",
-        "mexico",
-        "costa rica",
-        "pakistan",
-        "bangladesh",
-        "ukraine",
-        "emea",
-        "apac",
-        "latam",
-        "europe",
-        "asia",
-        # provinces
-        "ontario",
-        "quebec",
-        "alberta",
-        "british columbia",
-        "nova scotia",
-        "manitoba",
-        "saskatchewan",
-        # major cities that are unambiguous enough on their own
-        "london",
-        "toronto",
-        "vancouver",
-        "montreal",
-        "ottawa",
-        "calgary",
-        "dublin",
-        "edinburgh",
-        "manchester",
-        "berlin",
-        "munich",
-        "paris",
-        "madrid",
-        "barcelona",
-        "amsterdam",
-        "zurich",
-        "stockholm",
-        "oslo",
-        "copenhagen",
-        "helsinki",
-        "warsaw",
-        "bangalore",
-        "bengaluru",
-        "hyderabad",
-        "mumbai",
-        "pune",
-        "delhi",
-        "gurgaon",
-        "gurugram",
-        "chennai",
-        "tel aviv",
-        "dubai",
-        "sydney",
-        "melbourne",
-        "tokyo",
-        "seoul",
-        "shanghai",
-        "beijing",
-        "shenzhen",
-        "sao paulo",
-        "mexico city",
-        "buenos aires",
-        "bogota",
-        "nairobi",
-        "lagos",
-        "cairo",
-        "johannesburg",
-        "cape town",
-    )
+    tuple(name.split())
+    for line in _NON_US_NAMES.splitlines()
+    if not line.strip().startswith("#")
+    for name in line.split(",")
+    if name.strip()
 )
 _CA_PROVINCE_RE = re.compile(r",\s*(?:ON|BC|QC|AB|MB|NS|NB|NL|PE|SK)\b")
 _CODE_RE = re.compile(r"(?<![A-Za-z])([A-Za-z]{2})(?![A-Za-z])")
@@ -746,7 +646,6 @@ class _Role:
     family: str
     points: float
     keywords: tuple[str, ...]
-    in_title: bool
     reason: str  # with points, for a normal result
     plain_reason: str  # without points, for a hard-failed result
 
@@ -773,7 +672,6 @@ def _title_role(comp: _Compiled, title_tokens: Sequence[str]) -> _Role | None:
             fam.name,
             points,
             tuple(k.text for k, _ in hits),
-            True,
             f"{base} (+{points:g}).",
             f"{base}.",
         )
@@ -799,7 +697,7 @@ def _description_role(comp: _Compiled, desc_tokens: Sequence[str]) -> _Role | No
             f"Title names no role family; description mentions {len(found)} keyword(s) of "
             f"'{fam.name}'{_weight_note(fam.weight)}: {listed}"
         )
-        role = _Role(fam.name, points, tuple(found), False, f"{base} (+{points:g}).", f"{base}.")
+        role = _Role(fam.name, points, tuple(found), f"{base} (+{points:g}).", f"{base}.")
         rank = (-points, fam.order)
         if best is None or rank < best[0]:
             best = (rank, role)
