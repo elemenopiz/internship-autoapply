@@ -23,6 +23,8 @@ from autoapply.models import (
     FormQuestion,
     Opportunity,
     Profile,
+    RunMode,
+    RunReport,
     TailoredDocs,
 )
 
@@ -232,3 +234,38 @@ class BrowserProvider(Protocol):
     """Hands out Playwright browser contexts (persistent profile under data/browser_profile)."""
 
     def open_context(self) -> BrowserContext: ...
+
+
+class ApplicationRunner(Protocol):
+    """Runs ONE application attempt end to end (browser, adapter selection, blockers). Implemented by
+    ``apply.engine``; the pipeline depends only on this protocol so it can be tested with a fake runner."""
+
+    def apply_to(
+        self, opportunity: Opportunity, docs: TailoredDocs, *, dry_run: bool
+    ) -> ApplyResult:
+        """Never raises for expected failures: returns FAILED / NEEDS_MANUAL / SKIPPED results instead."""
+        ...
+
+    def close(self) -> None:
+        """Release the browser. Safe to call twice."""
+        ...
+
+
+class RunController(Protocol):
+    """What the dashboard/CLI use to start, observe and stop pipeline runs. Implemented by ``scheduler.RunManager``."""
+
+    def run_now(self, mode: RunMode | None = None, *, trigger: str = "manual") -> bool:
+        """Start a run in the background. Returns False if a run is already in progress."""
+        ...
+
+    def is_running(self) -> bool: ...
+
+    def request_stop(self) -> None:
+        """Ask the current run to stop after the current step (also honoured via the STOP file)."""
+        ...
+
+    def status(self) -> dict[str, object]:
+        """JSON-friendly snapshot: running, next_run_at, last_report (RunReport dict or None)."""
+        ...
+
+    def last_report(self) -> RunReport | None: ...
