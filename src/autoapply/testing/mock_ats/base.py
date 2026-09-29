@@ -18,12 +18,130 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, Response
 from starlette.datastructures import UploadFile
+
+
+@dataclass(frozen=True)
+class MockQuestion:
+    """A custom application question. Shared vocabulary so every mock site can ask the same things."""
+
+    key: str
+    label: str
+    kind: Literal["text", "textarea", "select", "radio", "checkbox", "multiselect"] = "text"
+    options: tuple[str, ...] = ()
+    required: bool = True
+    max_length: int | None = None
+
+
+YES_NO = ("Yes", "No")
+
+STANDARD_QUESTIONS: dict[str, MockQuestion] = {
+    q.key: q
+    for q in (
+        MockQuestion(
+            "work_auth",
+            "Are you legally authorized to work in the United States?",
+            "select",
+            YES_NO,
+        ),
+        MockQuestion(
+            "sponsorship",
+            "Will you now or in the future require sponsorship for employment visa status?",
+            "select",
+            YES_NO,
+        ),
+        MockQuestion(
+            "why_role", "Why are you interested in this role?", "textarea", max_length=1000
+        ),
+        MockQuestion(
+            "referral",
+            "How did you hear about us?",
+            "select",
+            (
+                "LinkedIn",
+                "Indeed",
+                "Company website",
+                "University career fair",
+                "Referral",
+                "Other",
+            ),
+        ),
+        MockQuestion(
+            "relocate", "Are you willing to relocate for this internship?", "radio", YES_NO
+        ),
+        MockQuestion(
+            "prev_employed", "Have you previously been employed by this company?", "radio", YES_NO
+        ),
+        MockQuestion("felony", "Have you ever been convicted of a felony?", "radio", YES_NO),
+        MockQuestion(
+            "salary", "What are your hourly compensation expectations?", "text", required=False
+        ),
+        MockQuestion(
+            "gender",
+            "Gender",
+            "select",
+            ("Male", "Female", "Non-binary", "Decline to self-identify"),
+            required=False,
+        ),
+        MockQuestion(
+            "race",
+            "Race / Ethnicity",
+            "select",
+            (
+                "Hispanic or Latino",
+                "White",
+                "Black or African American",
+                "Asian",
+                "Two or More Races",
+                "Decline to self-identify",
+            ),
+            required=False,
+        ),
+        MockQuestion(
+            "veteran",
+            "Veteran Status",
+            "select",
+            ("I am a protected veteran", "I am not a protected veteran", "I don't wish to answer"),
+            required=False,
+        ),
+        MockQuestion(
+            "disability",
+            "Disability Status",
+            "select",
+            (
+                "Yes, I have a disability",
+                "No, I do not have a disability",
+                "I do not want to answer",
+            ),
+            required=False,
+        ),
+        MockQuestion(
+            "certify", "I certify that the information provided is true and complete.", "checkbox"
+        ),
+        MockQuestion(
+            "terms", "I have read and agree to the privacy policy and terms of use.", "checkbox"
+        ),
+    )
+}
+
+
+@dataclass
+class MockJob:
+    """A posting served by a mock ATS site."""
+
+    id: str
+    title: str
+    location: str = "Austin, TX"
+    description: str = (
+        "Summer 2027 internship. Work with product, engineering and operations teams."
+    )
+    questions: tuple[MockQuestion, ...] = ()
+    closed: bool = False
 
 
 @dataclass
@@ -165,6 +283,7 @@ class MockSite:
         self.submissions: list[Submission] = []
         self.page_views: list[str] = []  # request paths of every GET, for assertions
         self.state: dict[str, Any] = {}  # free-form per-site state (accounts, sessions, ...)
+        self.jobs: dict[str, MockJob] = {}
         self.faults = FaultPlan()
         self.hub: MockHub | None = None
         self.port: int | None = None
