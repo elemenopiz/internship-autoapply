@@ -26,6 +26,12 @@ Sandbox facts: ATS hosts + api.openai.com are blocked (403) -> everything is ver
 | F | mock greenhouse/lever/ashby/blockers | w1/mocks-a | running |
 | G | mock workday/employer portal | w1/mocks-b | running |
 
+## Incident log
+- 12:00 UTC: all 8 running workers died together on an API session rate limit (429). Partial work survived in the
+  worktrees. Resumed C,D,E,F,G via SendMessage; HELD w2/accounts, w2/dashboard, w2/pipeline (barely started; relaunch
+  into the same worktrees after Wave 1 merges). Lesson: keep at most ~5 heavy workers in flight, tell workers to be
+  economical (no mutation-testing campaigns).
+
 ## Wave 2 workers launched early (deps already merged / injected)
 | task | branch / worktree | status |
 |---|---|---|
