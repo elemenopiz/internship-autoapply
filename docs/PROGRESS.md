@@ -24,7 +24,7 @@ Sandbox facts: ATS hosts + api.openai.com are blocked (403) -> everything is ver
 | D | boards + scoring | w1/boards-scoring | MERGED |
 | E | tailor + sample_profile | w1/tailor | MERGED |
 | F | mock greenhouse/lever/ashby/blockers | w1/mocks-a | MERGED (2931 tests, gate 2.5min) |
-| G | mock workday/employer portal | w1/mocks-b | running |
+| G | mock workday/employer portal | w1/mocks-b | MERGED (2994 tests; gate ~4min) |
 
 ## Incident log
 - 12:00 UTC: all 8 running workers died together on an API session rate limit (429). Partial work survived in the
@@ -38,14 +38,14 @@ Sandbox facts: ATS hosts + api.openai.com are blocked (403) -> everything is ver
 | accounts + emailverify | w2/accounts | resumed, running |
 | dashboard | w2/dashboard | running |
 | pipeline + scheduler | w2/pipeline | running |
-| apply framework (browser/blockers/registry/engine/helpers) | w2/framework | waits for mocks F+G merged |
+| apply framework (browser/blockers/registry/engine/helpers) | w2/framework | running |
 | answers engine | w2/answers | running |
 
 ## Wave log
 | wave | scope | status |
 |---|---|---|
 | 0 | spec, contracts, scaffold, mock-ATS base | done |
-| 1 | db, platform services, workbook, boards, scoring, tailoring, mock sites (x2) | A,B merged; C,D,E,F,G running |
+| 1 | db, platform services, workbook, boards, scoring, tailoring, mock sites (x2) | DONE, all merged |
 | 2 | apply engine, adapters, answers, accounts, generic filler | pending |
 | 3 | pipeline, scheduler, dashboard, CLI/PowerShell, LinkedIn/Indeed | pending |
 | 4 | acceptance suite + fix loop | pending |
