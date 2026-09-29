@@ -20,10 +20,10 @@ Sandbox facts: ATS hosts + api.openai.com are blocked (403) -> everything is ver
 |---|---|---|---|
 | A | db.py | worktree-agent-aad13fe4da705016e | MERGED (861 tests green) |
 | B | secrets/llm/readiness | worktree-agent-a3c3d4d01b46f7f2b | MERGED |
-| C | workbook + dedupe + fixtures | w1/workbook | running |
-| D | boards + scoring | w1/boards-scoring | running |
-| E | tailor + sample_profile | w1/tailor | running |
-| F | mock greenhouse/lever/ashby/blockers | w1/mocks-a | running |
+| C | workbook + dedupe + fixtures | w1/workbook | MERGED |
+| D | boards + scoring | w1/boards-scoring | MERGED |
+| E | tailor + sample_profile | w1/tailor | MERGED |
+| F | mock greenhouse/lever/ashby/blockers | w1/mocks-a | MERGED (2931 tests, gate 2.5min) |
 | G | mock workday/employer portal | w1/mocks-b | running |
 
 ## Incident log
@@ -35,11 +35,11 @@ Sandbox facts: ATS hosts + api.openai.com are blocked (403) -> everything is ver
 ## Wave 2 workers launched early (deps already merged / injected)
 | task | branch / worktree | status |
 |---|---|---|
-| accounts + emailverify | w2/accounts | running |
+| accounts + emailverify | w2/accounts | resumed, running |
 | dashboard | w2/dashboard | running |
 | pipeline + scheduler | w2/pipeline | running |
 | apply framework (browser/blockers/registry/engine/helpers) | w2/framework | waits for mocks F+G merged |
-| answers engine | w2/answers | waits for tailor (E) merged |
+| answers engine | w2/answers | running |
 
 ## Wave log
 | wave | scope | status |
