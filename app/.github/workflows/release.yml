@@ -1,0 +1,90 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_glob: 'dist/*.zip'
+            artifact_name: installer-windows
+          - os: macos-latest
+            artifact_glob: 'dist/*.zip'
+            artifact_name: installer-macos
+          - os: ubuntu-latest
+            artifact_glob: 'dist/*.zip'
+            artifact_name: installer-linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .[dev]
+
+      - name: Build with PyInstaller
+        run: |
+          pip install pyinstaller
+          pyinstaller autoapply.spec
+        timeout-minutes: 15
+
+      - name: Package distribution
+        shell: bash
+        run: |
+          cd dist
+          VERSION=$(python -c "import tomllib; print(tomllib.load(open('../pyproject.toml','rb'))['project']['version'])")
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            PLATFORM="win-x64"
+            7z a "AutoApply-${VERSION}-${PLATFORM}.zip" AutoApply/
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            PLATFORM="mac-x64"
+            zip -r "AutoApply-${VERSION}-${PLATFORM}.zip" AutoApply/
+          else
+            PLATFORM="linux-x64"
+            zip -r "AutoApply-${VERSION}-${PLATFORM}.zip" AutoApply/
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: always() && contains(needs.build.result, 'success')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f | head -20
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/installer-windows/*
+            artifacts/installer-macos/*
+            artifacts/installer-linux/*
+          generate_release_notes: true
+          draft: ${{ contains(needs.build.result, 'failure') }}

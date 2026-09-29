@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-i18n="app.page_title">AutoApply — Smart Job Application Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.4/socket.io.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+
+<!-- Skip Navigation Link (WCAG 2.1 §2.4.1) -->
+<a href="#app-screens" class="sr-only sr-only-focusable" data-i18n="app.skip_to_content">Skip to main content</a>
+
+<!-- ════════════════════════════════════════════════════════════════
+     SETUP WIZARD OVERLAY
+     ════════════════════════════════════════════════════════════════ -->
+<div id="wizard-overlay" class="hidden" role="region" aria-label="Setup Wizard">
+  <div id="wizard-box" role="form" aria-label="Setup Wizard Form">
+    <div class="wizard-progress" id="wizard-progress" role="progressbar" aria-label="Setup progress" aria-valuemin="1" aria-valuemax="7" aria-valuenow="1"></div>
+
+    <!-- Step 1: Welcome -->
+    <div class="wizard-step" data-step="0">
+      <h2 data-i18n="wizard.welcome_title">Welcome to AutoApply</h2>
+      <p class="subtitle" data-i18n="wizard.welcome_subtitle">
+        AutoApply automates your job search by scanning platforms, matching opportunities to your profile,
+        generating tailored resumes and cover letters, and applying on your behalf. Let's get you set up
+        in a few quick steps.
+      </p>
+      <div style="margin-bottom:20px">
+        <span class="status-badge" id="wizard-ai-status" data-i18n="wizard.ai_checking">
+          Checking AI provider...
+        </span>
+      </div>
+      <div class="wizard-nav">
+        <button class="btn btn-ghost" onclick="setWizardStep(5)" data-i18n="wizard.skip_to_login">Skip to Platform Login</button>
+        <button class="btn btn-primary btn-lg" onclick="wizardNext()" data-i18n="wizard.get_started">Get Started</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Experience Folder -->
+    <div class="wizard-step" data-step="1">
+      <h2 data-i18n="wizard.experience_title">Experience Folder</h2>
+      <p class="subtitle" data-i18n="wizard.experience_subtitle">
+        AutoApply reads your professional experiences from text files. Place your work history, projects,
+        certifications, and skills into separate files in the experiences folder. The AI uses these to
+        craft perfectly tailored resumes.
+      </p>
+      <div class="card" style="margin-bottom:16px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <code style="font-size:.9rem; color:var(--info); word-break:break-all;">~/.autoapply/profile/experiences/</code>
+        <button class="btn btn-ghost btn-sm" onclick="alert('Open this path in your file explorer:\n\n~/.autoapply/profile/experiences/')" data-i18n="wizard.open_folder">Open Folder</button>
+      </div>
+      <div style="margin-bottom:8px">
+        Files detected: <strong id="wizard-file-count">0</strong>
+        <button class="btn btn-ghost btn-sm" onclick="wizardRefreshFiles()" style="margin-left:8px" data-i18n="wizard.refresh">Refresh</button>
+      </div>
+      <div class="wizard-nav">
+        <button class="btn btn-ghost" onclick="wizardPrev()" data-i18n="wizard.back">Back</button>
+        <button class="btn btn-primary" onclick="wizardNext()" data-i18n="wizard.next">Next</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Profile -->
+    <div class="wizard-step" data-step="2">
+      <h2 data-i18n="wizard.profile_title">Your Profile</h2>
+      <p class="subtitle" data-i18n="wizard.profile_subtitle">Basic information used across your applications.</p>
+      <div class="flex-col gap-md">
+        <div class="settings-grid">
+          <div class="form-group">
+            <label for="wiz-first-name" data-i18n="form.first_name_required">First Name *</label>
+            <input type="text" class="form-control" id="wiz-first-name" placeholder="Jane" data-i18n-placeholder="placeholder.first_name" aria-required="true">
+          </div>
+          <div class="form-group">
+            <label for="wiz-last-name" data-i18n="form.last_name_required">Last Name *</label>
+            <input type="text" class="form-control" id="wiz-last-name" placeholder="Doe" data-i18n-placeholder="placeholder.last_name" aria-required="true">
+          </div>
+          <div class="form-group">
+            <label for="wiz-email" data-i18n="form.email_required">Email *</label>
+            <input type="email" class="form-control" id="wiz-email" placeholder="jane@example.com" data-i18n-placeholder="placeholder.email" aria-required="true">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.phone">Phone</label>
+            <div style="display:flex; gap:8px;">
+              <input type="text" class="form-control" id="wiz-phone-code" placeholder="+1" data-i18n-placeholder="placeholder.phone_code" style="width:70px; flex-shrink:0;">
+              <input type="tel" class="form-control" id="wiz-phone" placeholder="555-0123" data-i18n-placeholder="placeholder.phone" style="flex:1;">
+            </div>
+          </div>
+        </div>
+        <div class="settings-grid">
+          <div class="form-group">
+            <label data-i18n="form.address_line1">Address Line 1</label>
+            <input type="text" class="form-control" id="wiz-address1" placeholder="123 Main St" data-i18n-placeholder="placeholder.address1">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.address_line2">Address Line 2</label>
+            <input type="text" class="form-control" id="wiz-address2" placeholder="Apt 4B" data-i18n-placeholder="placeholder.address2">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.city_required">City *</label>
+            <input type="text" class="form-control" id="wiz-city" placeholder="San Francisco" data-i18n-placeholder="placeholder.city">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.state_required">State *</label>
+            <input type="text" class="form-control" id="wiz-state" placeholder="CA" data-i18n-placeholder="placeholder.state">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.zip_code">ZIP Code</label>
+            <input type="text" class="form-control" id="wiz-zip" placeholder="94105" data-i18n-placeholder="placeholder.zip">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.country">Country</label>
+            <input type="text" class="form-control" id="wiz-country" placeholder="United States" data-i18n-placeholder="placeholder.country" value="United States">
+          </div>
+        </div>
+        <div class="form-group">
+          <label data-i18n="form.bio">Bio / Summary</label>
+          <textarea class="form-control" id="wiz-bio" rows="3" placeholder="Brief professional summary..." data-i18n-placeholder="placeholder.bio"></textarea>
+        </div>
+        <div class="settings-grid">
+          <div class="form-group">
+            <label data-i18n="form.linkedin_url">LinkedIn URL (optional)</label>
+            <input type="url" class="form-control" id="wiz-linkedin" placeholder="https://linkedin.com/in/..." data-i18n-placeholder="placeholder.linkedin">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.portfolio_url">Portfolio URL (optional)</label>
+            <input type="url" class="form-control" id="wiz-portfolio" placeholder="https://..." data-i18n-placeholder="placeholder.portfolio">
+          </div>
+        </div>
+        <details style="margin-top:4px;">
+          <summary style="cursor:pointer; font-weight:600; font-size:.9rem; color:var(--primary);" data-i18n="wizard.app_answers_summary">Application Answers (recommended)</summary>
+          <p style="color:var(--text-dim); font-size:.82rem; margin:8px 0 12px;" data-i18n="wizard.app_answers_hint">
+            Pre-fill answers for common screening questions on Workday, Ashby, and other portals.
+          </p>
+          <div class="settings-grid">
+            <div class="form-group">
+              <label data-i18n="form.work_authorization">Work Authorization</label>
+              <select class="form-control" id="wiz-work-authorization">
+                <option value="">— Select —</option>
+                <option value="Yes">Yes — authorized to work</option>
+                <option value="No">No — not authorized</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label data-i18n="form.visa_sponsorship">Visa Sponsorship Needed?</label>
+              <select class="form-control" id="wiz-visa-sponsorship">
+                <option value="">— Select —</option>
+                <option value="Yes">Yes — need sponsorship</option>
+                <option value="No">No — don't need sponsorship</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label data-i18n="form.years_experience">Years of Experience</label>
+              <input type="text" class="form-control" id="wiz-years-experience" placeholder="e.g. 5" data-i18n-placeholder="placeholder.years_experience">
+            </div>
+            <div class="form-group">
+              <label data-i18n="form.desired_salary">Desired Salary</label>
+              <input type="text" class="form-control" id="wiz-desired-salary" placeholder="e.g. 150000" data-i18n-placeholder="placeholder.salary">
+            </div>
+            <div class="form-group">
+              <label data-i18n="form.willing_relocate">Willing to Relocate?</label>
+              <select class="form-control" id="wiz-willing-relocate">
+                <option value="">— Select —</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label data-i18n="form.start_date">Earliest Start Date</label>
+              <input type="text" class="form-control" id="wiz-start-date" placeholder="e.g. Immediately, 2 weeks" data-i18n-placeholder="placeholder.start_date">
+            </div>
+          </div>
+        </details>
+      </div>
+      <div class="wizard-nav">
+        <button class="btn btn-ghost" onclick="wizardPrev()" data-i18n="wizard.back">Back</button>
+        <button class="btn btn-primary" onclick="wizardNext()" data-i18n="wizard.next">Next</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Job Preferences -->
+    <div class="wizard-step" data-step="3">
+      <h2 data-i18n="wizard.preferences_title">Job Preferences</h2>
+      <p class="subtitle" data-i18n="wizard.preferences_subtitle">Tell us what you're looking for.</p>
+      <div class="flex-col gap-md">
+        <div class="form-group">
+          <label data-i18n="form.job_titles">Job Titles</label>
+          <div class="tag-input-container">
+            <div class="tag-input-row">
+              <div class="tag-input-wrap" id="wiz-titles-tags" data-field="titles" data-placeholder="e.g. Software Engineer"></div>
+              <button type="button" class="tag-add-btn" onclick="addTagFromInput('wiz-titles-tags')" data-i18n="button.add_tag">Add</button>
+            </div>
+            <div class="tag-suggestions" data-for="wiz-titles-tags">
+              <button type="button" class="tag-suggestion" onclick="addTag('wiz-titles-tags','Software Engineer')">Software Engineer</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('wiz-titles-tags','Product Manager')">Product Manager</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('wiz-titles-tags','Data Scientist')">Data Scientist</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('wiz-titles-tags','Program Manager')">Program Manager</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('wiz-titles-tags','UX Designer')">UX Designer</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('wiz-titles-tags','DevOps Engineer')">DevOps Engineer</button>
+            </div>
+            <div class="form-hint" data-i18n="form.hint_titles">Add each title you'd like to search for. The bot searches all of them.</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label data-i18n="form.locations">Preferred Locations</label>
+          <div class="tag-input-container">
+            <div class="tag-input-row">
+              <div class="tag-input-wrap" id="wiz-locations-tags" data-field="locations" data-placeholder="e.g. New York, NY"></div>
+              <button type="button" class="tag-add-btn" onclick="addTagFromInput('wiz-locations-tags')" data-i18n="button.add_tag">Add</button>
+            </div>
+            <div class="tag-suggestions" data-for="wiz-locations-tags">
+              <button type="button" class="tag-suggestion" onclick="addTag('wiz-locations-tags','Remote')">Remote</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('wiz-locations-tags','United States')">United States</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('wiz-locations-tags','New York, NY')">New York, NY</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('wiz-locations-tags','San Francisco, CA')">San Francisco, CA</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('wiz-locations-tags','Austin, TX')">Austin, TX</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('wiz-locations-tags','Seattle, WA')">Seattle, WA</button>
+            </div>
+            <div class="form-hint" data-i18n="form.hint_locations">Add cities or "Remote". The bot searches all locations.</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-md">
+          <span id="wiz-remote-label" style="font-weight:600; font-size:.9rem; color:var(--text-dim);" data-i18n="form.remote_only">Remote Only</span>
+          <label class="toggle-switch" for="wiz-remote">
+            <input type="checkbox" id="wiz-remote" role="switch" aria-labelledby="wiz-remote-label">
+            <span class="slider" aria-hidden="true"></span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label data-i18n="form.salary_min">Minimum Salary (optional)</label>
+          <input type="number" class="form-control" id="wiz-salary" placeholder="e.g. 100000" data-i18n-placeholder="placeholder.salary_input" style="max-width:220px">
+        </div>
+        <div class="form-group">
+          <label data-i18n="form.keywords_include">Keywords to Include</label>
+          <div class="tag-input-container">
+            <div class="tag-input-row">
+              <div class="tag-input-wrap" id="wiz-include-tags" data-field="include_keywords" data-placeholder="e.g. Python, AWS"></div>
+              <button type="button" class="tag-add-btn" onclick="addTagFromInput('wiz-include-tags')" data-i18n="button.add_tag">Add</button>
+            </div>
+            <div class="form-hint" data-i18n="form.hint_include">Jobs must mention these keywords to pass the filter.</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label data-i18n="form.keywords_exclude">Keywords to Exclude</label>
+          <div class="tag-input-container">
+            <div class="tag-input-row">
+              <div class="tag-input-wrap" id="wiz-exclude-tags" data-field="exclude_keywords" data-placeholder="e.g. Intern, Unpaid"></div>
+              <button type="button" class="tag-add-btn" onclick="addTagFromInput('wiz-exclude-tags')" data-i18n="button.add_tag">Add</button>
+            </div>
+            <div class="form-hint" data-i18n="form.hint_exclude">Jobs with these keywords are automatically skipped.</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label data-i18n="form.experience_level">Experience Level</label>
+          <div class="checkboxes-group">
+            <label><input type="checkbox" value="entry" class="wiz-exp-level"><span data-i18n="experience_levels.entry_short">Entry</span></label>
+            <label><input type="checkbox" value="mid" class="wiz-exp-level"><span data-i18n="experience_levels.mid_short">Mid</span></label>
+            <label><input type="checkbox" value="senior" class="wiz-exp-level"><span data-i18n="experience_levels.senior">Senior</span></label>
+            <label><input type="checkbox" value="lead" class="wiz-exp-level"><span data-i18n="experience_levels.lead_short">Lead</span></label>
+          </div>
+        </div>
+      </div>
+      <div class="wizard-nav">
+        <button class="btn btn-ghost" onclick="wizardPrev()" data-i18n="wizard.back">Back</button>
+        <button class="btn btn-primary" onclick="wizardNext()" data-i18n="wizard.next">Next</button>
+      </div>
+    </div>
+
+    <!-- Step 5: Fallback Resume -->
+    <div class="wizard-step" data-step="4">
+      <h2 data-i18n="wizard.resume_title">Fallback Resume</h2>
+      <p class="subtitle" data-i18n="wizard.resume_subtitle">
+        Upload a PDF resume to use when AI generation is unavailable. This is optional.
+      </p>
+      <div class="file-upload-zone" id="wiz-resume-zone" role="button" tabindex="0" aria-label="Upload resume file. Click or drag and drop. PDF or DOCX, max 5MB" onclick="document.getElementById('wiz-resume-input').click()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('wiz-resume-input').click();}">
+        <input type="file" id="wiz-resume-input" accept=".pdf,.docx" aria-label="Resume file input">
+        <div id="wiz-resume-label" aria-hidden="true">
+          <div style="font-size:2rem; margin-bottom:8px; opacity:.5;">&#128196;</div>
+          <div data-i18n="wizard.upload_cta">Click to upload or drag & drop</div>
+          <div class="text-dim" style="font-size:.82rem; margin-top:4px;" data-i18n="wizard.upload_hint">PDF or DOCX, max 5MB</div>
+        </div>
+      </div>
+      <div class="wizard-nav">
+        <button class="btn btn-ghost" onclick="wizardPrev()" data-i18n="wizard.back">Back</button>
+        <div class="flex gap-sm">
+          <button class="btn btn-ghost" onclick="wizardNext()" data-i18n="wizard.skip">Skip</button>
+          <button class="btn btn-primary" onclick="wizardNext()" data-i18n="wizard.next">Next</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 6: Platform Login -->
+    <div class="wizard-step" data-step="5">
+      <h2 data-i18n="wizard.login_title">Platform Login</h2>
+      <p class="subtitle" data-i18n="wizard.platform_login_subtitle">
+        AutoApply opens a browser window where you can log into your accounts. Your sessions are saved so you only need to do this once.
+      </p>
+      <div class="flex-col gap-md" style="margin-top:8px">
+        <div class="flex items-center gap-md" style="justify-content:center;">
+          <button class="btn btn-primary" id="wizard-linkedin-login" onclick="openLoginBrowser('https://www.linkedin.com/login')" data-i18n="wizard.open_linkedin_login">
+            Open LinkedIn Login
+          </button>
+          <span id="wiz-linkedin-session" class="status-badge" style="font-size:.8rem;"><span class="dot dot-gray"></span> Not connected</span>
+        </div>
+        <div class="flex items-center gap-md" style="justify-content:center;">
+          <button class="btn btn-primary" id="wizard-indeed-login" onclick="openLoginBrowser('https://secure.indeed.com/auth')" data-i18n="wizard.open_indeed_login">
+            Open Indeed Login
+          </button>
+          <span id="wiz-indeed-session" class="status-badge" style="font-size:.8rem;"><span class="dot dot-gray"></span> Not connected</span>
+        </div>
+        <button class="btn btn-ghost hidden" id="wizard-close-browser" onclick="closeLoginBrowser()" style="width:100%; justify-content:center;" data-i18n="wizard.close_browser">
+          Close Browser
+        </button>
+        <div id="wizard-login-status" class="text-dim" style="font-size:.88rem; text-align:center;"></div>
+      </div>
+      <div class="wizard-nav">
+        <button class="btn btn-ghost" onclick="wizardPrev()" data-i18n="wizard.back">Back</button>
+        <button class="btn btn-primary" onclick="closeLoginBrowser();wizardNext()" data-i18n="wizard.next">Next</button>
+      </div>
+    </div>
+
+    <!-- Step 7: Done -->
+    <div class="wizard-step" data-step="6">
+      <h2 style="color:var(--success);" data-i18n="wizard.done_title">You're All Set!</h2>
+      <p class="subtitle" data-i18n="wizard.done_subtitle">
+        AutoApply is configured and ready to help you land your next role. Here's a summary:
+      </p>
+      <div id="wizard-summary" class="card" style="font-size:.9rem; line-height:1.8; margin-bottom:8px;"></div>
+      <div class="wizard-nav">
+        <button class="btn btn-ghost" onclick="wizardPrev()" data-i18n="wizard.back">Back</button>
+        <button class="btn btn-success btn-lg" onclick="wizardFinish()" data-i18n="wizard.finish">Go to Dashboard</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════
+     NAVBAR
+     ════════════════════════════════════════════════════════════════ -->
+<nav id="navbar" class="hidden" aria-label="Main navigation">
+  <div class="logo" aria-hidden="true">Auto<span>Apply</span></div>
+  <ul class="nav-tabs" role="tablist">
+    <li role="presentation"><a role="tab" class="active" data-screen="dashboard" aria-selected="true" tabindex="0" data-i18n="nav.dashboard">Dashboard</a></li>
+    <li role="presentation"><a role="tab" data-screen="applications" aria-selected="false" tabindex="-1" data-i18n="nav.applications">Applications</a></li>
+    <li role="presentation"><a role="tab" data-screen="profile" aria-selected="false" tabindex="-1" data-i18n="nav.profile">Profile</a></li>
+    <li role="presentation"><a role="tab" data-screen="analytics" aria-selected="false" tabindex="-1" data-i18n="nav.analytics">Analytics</a></li>
+    <li role="presentation"><a role="tab" data-screen="resumes" aria-selected="false" tabindex="-1" data-i18n="nav.resumes">Resume Library</a></li>
+    <li role="presentation"><a role="tab" data-screen="knowledge-base" aria-selected="false" tabindex="-1" data-i18n="nav.knowledge_base">Knowledge Base</a></li>
+    <li role="presentation"><a role="tab" data-screen="settings" aria-selected="false" tabindex="-1" data-i18n="nav.settings">Settings</a></li>
+  </ul>
+  <div class="nav-right">
+    <span class="flex items-center gap-sm" id="nav-ai-indicator" role="status" aria-live="polite">
+      <span class="dot dot-gray" aria-hidden="true"></span>
+      <span>AI</span>
+    </span>
+  </div>
+</nav>
+
+<!-- ════════════════════════════════════════════════════════════════
+     SCREENS
+     ════════════════════════════════════════════════════════════════ -->
+<main class="main-content hidden" id="app-screens" role="main">
+
+  <!-- DASHBOARD -->
+  <div class="screen" id="screen-dashboard">
+    <div class="card" style="margin-bottom:24px">
+      <div class="bot-control">
+        <div class="bot-status-text" role="status" aria-live="polite" aria-atomic="true">
+          <span class="dot dot-gray dot-pulse" id="bot-dot" aria-hidden="true"></span>
+          <span id="bot-status-label">Stopped</span>
+        </div>
+        <div class="bot-stats" role="group" aria-label="Bot statistics">
+          <div class="bot-stat"><div class="num" id="stat-found" aria-label="Jobs found">0</div><div class="label" aria-hidden="true" data-i18n="dashboard.stat_found">Found</div></div>
+          <div class="bot-stat"><div class="num" id="stat-applied" aria-label="Jobs applied">0</div><div class="label" aria-hidden="true" data-i18n="dashboard.stat_applied">Applied</div></div>
+          <div class="bot-stat"><div class="num" id="stat-errors" aria-label="Errors">0</div><div class="label" aria-hidden="true" data-i18n="dashboard.stat_errors">Errors</div></div>
+          <div class="bot-stat"><div class="num" id="stat-uptime" aria-label="Uptime">--:--</div><div class="label" aria-hidden="true" data-i18n="dashboard.stat_uptime">Uptime</div></div>
+        </div>
+        <div class="mode-selector">
+          <label for="apply-mode-select" data-i18n="dashboard.mode_label">Mode:</label>
+          <select id="apply-mode-select" onchange="changeApplyMode(this.value)">
+            <option value="full_auto">Full Auto</option>
+            <option value="review" selected>Review</option>
+            <option value="watch">Watch</option>
+          </select>
+        </div>
+        <div class="bot-buttons">
+          <button class="btn btn-success btn-sm" id="btn-start" onclick="botControl('start')" data-i18n="button.start">Start</button>
+          <button class="btn btn-warning btn-sm" id="btn-pause" onclick="botControl('pause')" disabled data-i18n="button.pause">Pause</button>
+          <button class="btn btn-danger btn-sm"  id="btn-stop"  onclick="botControl('stop')"  disabled data-i18n="button.stop">Stop</button>
+        </div>
+        <div class="bot-toggles">
+          <label class="bot-toggle" for="set-adaptive-resume">
+            <input type="checkbox" id="set-adaptive-resume" checked>
+            <span data-i18n="settings.adaptive_resume">Adaptive Resume</span>
+          </label>
+          <label class="bot-toggle" for="set-cover-letter">
+            <input type="checkbox" id="set-cover-letter" checked>
+            <span data-i18n="settings.cover_letter">Cover Letter</span>
+          </label>
+          <span class="bot-toggle-separator"></span>
+          <div class="default-resume-control">
+            <span class="default-resume-label" data-i18n="settings.default_resume">Default Resume:</span>
+            <span id="default-resume-name" class="default-resume-name">None</span>
+            <button class="btn btn-xs btn-secondary" id="btn-upload-default-resume" onclick="document.getElementById('default-resume-input').click()" data-i18n="button.upload">Upload</button>
+            <button class="btn btn-xs btn-danger hidden" id="btn-remove-default-resume" onclick="removeDefaultResume()">&#10005;</button>
+            <input type="file" id="default-resume-input" accept=".pdf,.docx" style="display:none" onchange="uploadDefaultResume(this)">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="ai-warning-banner" class="alert-warning hidden" role="alert">
+      <span class="alert-icon" aria-hidden="true">&#9888;</span>
+      <span>No AI provider configured &mdash; using fallback templates. Add an API key in <button type="button" onclick="showScreen('settings')" class="alert-link">Settings &rarr; AI Provider</button> for tailored resumes and cover letters.</span>
+    </div>
+
+    <!-- Review Card — shown when bot is awaiting review decision -->
+    <div id="review-card" class="review-card hidden" role="region" aria-label="Review pending application" aria-live="assertive">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <h3 id="review-job-title">Job Title at Company</h3>
+          <div class="review-meta">
+            <span id="review-platform">linkedin</span> &middot;
+            Match score: <strong id="review-score">85</strong>%
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="reviewSkip()" style="white-space:nowrap;" data-i18n="button.skip">Skip</button>
+      </div>
+      <div class="review-section">
+        <h4 data-i18n="review.cover_letter_heading">Cover Letter</h4>
+        <textarea id="review-cover-letter" aria-label="Cover letter text for review"></textarea>
+      </div>
+      <div class="review-actions">
+        <button class="btn btn-success" onclick="reviewApprove()" data-i18n="button.approve_and_apply">Approve &amp; Apply</button>
+        <button class="btn btn-primary" onclick="reviewEdit()" data-i18n="review.edit_and_apply">Edit &amp; Apply</button>
+        <button class="btn btn-warning" id="review-manual-submit" onclick="reviewManualSubmit()" data-i18n="button.manual_apply">Apply Manually</button>
+        <button class="btn btn-ghost" onclick="reviewSkip()" data-i18n="button.skip">Skip</button>
+      </div>
+    </div>
+
+    <!-- Login Gate Modal (FR-089) -->
+    <div class="modal-overlay hidden" id="modal-login-gate">
+      <div class="modal-box" role="alertdialog" aria-modal="true" aria-labelledby="login-gate-title" aria-describedby="login-gate-desc">
+        <button class="modal-close" onclick="closeModal('modal-login-gate')" aria-label="Close dialog">&times;</button>
+        <h3 id="login-gate-title" data-i18n="login_gate.title">Login Required</h3>
+        <p id="login-gate-desc" class="text-dim" style="margin-bottom:16px;" data-i18n="login_gate.description">
+          The bot detected a login wall. Please log in to this portal, then click "I've Logged In" to continue.
+        </p>
+        <div style="background:var(--bg); padding:12px; border-radius:var(--radius-sm); margin-bottom:16px;">
+          <div style="font-size:.85rem; margin-bottom:4px;"><strong data-i18n="login_gate.domain_label">Portal:</strong> <span id="login-gate-domain"></span></div>
+          <div style="font-size:.85rem;"><strong data-i18n="login_gate.type_label">Type:</strong> <span id="login-gate-type"></span></div>
+          <div style="font-size:.85rem; margin-top:4px;" class="hidden"><a id="login-gate-url" href="#" target="_blank" rel="noopener" data-i18n="login_gate.open_portal">Open portal</a></div>
+        </div>
+        <p class="text-dim" style="font-size:.85rem; margin-bottom:12px;" data-i18n="login_gate.save_hint">
+          Optionally save your credentials below for future auto-login:
+        </p>
+        <div class="form-group" style="margin-bottom:12px;">
+          <label for="login-gate-username" data-i18n="login_gate.username_label">Username / Email</label>
+          <input type="text" class="form-control" id="login-gate-username" autocomplete="username">
+        </div>
+        <div class="form-group" style="margin-bottom:20px;">
+          <label for="login-gate-password" data-i18n="login_gate.password_label">Password</label>
+          <input type="password" class="form-control" id="login-gate-password" autocomplete="current-password">
+        </div>
+        <div class="flex gap-sm">
+          <button class="btn btn-success" onclick="loginGateDone()" data-i18n="login_gate.done_button">I've Logged In</button>
+          <button class="btn btn-ghost" onclick="loginGateSkip()" data-i18n="login_gate.skip_button">Skip This Job</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="flex justify-between items-center" style="margin-bottom:12px;">
+        <h3 class="flex items-center gap-sm" style="margin-bottom:0;" data-i18n="dashboard.activity_feed">
+          Activity Feed
+          <span id="feed-count" class="text-dim" style="font-size:.78rem; font-weight:400;"></span>
+        </h3>
+        <button class="btn btn-ghost btn-sm" onclick="clearFeed()" data-i18n="button.clear_feed">Clear</button>
+      </div>
+      <div class="feed-list" id="feed-list" role="log" aria-live="polite" aria-label="Activity feed">
+        <div class="text-center text-dim" id="feed-empty" style="padding:40px 0;" data-i18n="feed.empty">
+          No activity yet. Start the bot to begin.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- APPLICATIONS -->
+  <div class="screen hidden" id="screen-applications">
+    <div class="card" style="margin-bottom:20px">
+      <div class="filter-bar">
+        <select class="form-control" id="filter-status" onchange="loadApplications()" aria-label="Filter by status">
+          <option value="">All Statuses</option>
+          <option value="applied">Applied</option>
+          <option value="interview">Interview</option>
+          <option value="rejected">Rejected</option>
+          <option value="offer">Offer</option>
+          <option value="withdrawn">Withdrawn</option>
+          <option value="error">Error</option>
+          <option value="manual_required">Manual Required</option>
+        </select>
+        <select class="form-control" id="filter-platform" onchange="loadApplications()" aria-label="Filter by platform">
+          <option value="">All Platforms</option>
+          <option value="linkedin">LinkedIn</option>
+          <option value="indeed">Indeed</option>
+        </select>
+        <input type="text" class="form-control" id="filter-search" placeholder="Search jobs..." data-i18n-placeholder="placeholder.search" oninput="debounceSearch()" aria-label="Search jobs">
+        <button class="btn btn-ghost btn-sm" onclick="exportCSV()" data-i18n="button.export_csv">Export CSV</button>
+      </div>
+    </div>
+    <div class="card">
+      <div style="overflow-x:auto;">
+        <table class="data-table" aria-label="Job applications">
+          <thead>
+            <tr>
+              <th scope="col" data-i18n="applications.col_company">Company</th>
+              <th scope="col" data-i18n="applications.col_job_title">Job Title</th>
+              <th scope="col" data-i18n="applications.col_platform">Platform</th>
+              <th scope="col" data-i18n="applications.col_match">Match</th>
+              <th scope="col" data-i18n="applications.col_status">Status</th>
+              <th scope="col" data-i18n="applications.col_applied">Applied</th>
+              <th scope="col" data-i18n="applications.col_resume">Resume</th>
+              <th scope="col" data-i18n="applications.col_cover_letter">Cover Letter</th>
+              <th scope="col" data-i18n="applications.col_notes">Notes</th>
+            </tr>
+          </thead>
+          <tbody id="applications-body">
+            <tr><td colspan="9" class="text-center text-dim" style="padding:40px 0;" data-i18n="applications.loading_applications">Loading applications...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <nav class="pagination" id="applications-pagination" aria-label="Applications pagination"></nav>
+    </div>
+  </div>
+
+  <!-- PROFILE -->
+  <div class="screen hidden" id="screen-profile">
+    <div class="flex justify-between items-center" style="margin-bottom:20px;">
+      <h2 data-i18n="profile.screen_title">Experience Files</h2>
+      <div class="flex items-center gap-md">
+        <span class="flex items-center gap-sm" id="profile-ai-indicator" role="status" aria-live="polite">
+          <span class="dot dot-gray" aria-hidden="true"></span>
+          <span style="font-size:.85rem;">AI</span>
+        </span>
+        <button class="btn btn-primary btn-sm" onclick="showFileModal()" data-i18n="button.new_file">+ New File</button>
+      </div>
+    </div>
+    <div class="file-grid" id="profile-file-grid">
+      <div class="text-center text-dim" style="padding:40px 0; grid-column: 1/-1;" data-i18n="profile.loading">Loading files...</div>
+    </div>
+  </div>
+
+  <!-- ANALYTICS -->
+  <div class="screen hidden" id="screen-analytics">
+    <h2 data-i18n="analytics.screen_title">Analytics</h2>
+
+    <!-- Summary Cards (FR-090) -->
+    <div class="analytics-summary-cards" id="analytics-summary" role="region" aria-label="Summary metrics">
+      <div class="summary-card">
+        <div class="summary-value" id="summary-total">—</div>
+        <div class="summary-label" data-i18n="analytics.summary_total">Total Applications</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-value" id="summary-interview-rate">—</div>
+        <div class="summary-label" data-i18n="analytics.summary_interview_rate">Interview Rate</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-value" id="summary-avg-score">—</div>
+        <div class="summary-label" data-i18n="analytics.summary_avg_score">Avg Match Score</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-value" id="summary-this-week">—</div>
+        <div class="summary-label" data-i18n="analytics.summary_this_week">This Week</div>
+      </div>
+    </div>
+
+    <!-- Period Selector (FR-100) -->
+    <div class="analytics-period-selector" role="group" aria-label="Time period">
+      <button class="period-btn" data-days="7" data-i18n="analytics.period_7d" onclick="window.switchAnalyticsPeriod(7)">7d</button>
+      <button class="period-btn active" data-days="30" data-i18n="analytics.period_30d" onclick="window.switchAnalyticsPeriod(30)">30d</button>
+      <button class="period-btn" data-days="90" data-i18n="analytics.period_90d" onclick="window.switchAnalyticsPeriod(90)">90d</button>
+      <button class="period-btn" data-days="0" data-i18n="analytics.period_all" onclick="window.switchAnalyticsPeriod(0)">All</button>
+    </div>
+
+    <!-- Trend Chart (FR-091) -->
+    <div class="card" style="margin-bottom:20px">
+      <h3 style="margin-bottom:16px;" data-i18n="analytics.chart_daily_title">Applications Over Time</h3>
+      <div class="chart-container"><canvas id="chart-daily"></canvas></div>
+    </div>
+
+    <!-- Funnel + Platform Table (FR-092, FR-093) -->
+    <div class="analytics-grid">
+      <div class="card">
+        <h3 style="margin-bottom:16px;" data-i18n="analytics.funnel_title">Conversion Funnel</h3>
+        <div class="chart-container"><canvas id="chart-funnel"></canvas></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:16px;" data-i18n="analytics.platform_title">Platform Performance</h3>
+        <div id="platform-table-container"></div>
+      </div>
+    </div>
+
+    <!-- Score Distribution + Weekly Summary (FR-095, FR-096) -->
+    <div class="analytics-grid">
+      <div class="card">
+        <h3 style="margin-bottom:16px;" data-i18n="analytics.score_title">Score Distribution</h3>
+        <div class="chart-container"><canvas id="chart-score"></canvas></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:16px;" data-i18n="analytics.weekly_title">Weekly Summary</h3>
+        <div id="weekly-summary-container"></div>
+      </div>
+    </div>
+
+    <!-- Top Companies + Response Times (FR-097, FR-098) -->
+    <div class="analytics-grid">
+      <div class="card">
+        <h3 style="margin-bottom:16px;" data-i18n="analytics.companies_title">Top Companies</h3>
+        <div id="top-companies-container"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-bottom:16px;" data-i18n="analytics.response_title">Response Times</h3>
+        <div id="response-times-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESUME LIBRARY -->
+  <div class="screen hidden" id="screen-resumes" role="tabpanel" aria-label="Resume Library">
+    <h2 data-i18n="resumes.title">Resume Library</h2>
+
+    <!-- Metrics summary cards -->
+    <div class="resume-metrics-cards" id="resume-metrics" role="region" aria-label="Resume effectiveness metrics">
+    </div>
+
+    <!-- Search + controls -->
+    <div class="resume-library-controls">
+      <input type="text" id="resume-search" class="form-input"
+             data-i18n-placeholder="resumes.search_placeholder"
+             placeholder="Search by company or job title..."
+             aria-label="Search resumes">
+      <select id="resume-sort" class="form-input" aria-label="Sort resumes">
+        <option value="created_at" data-i18n="resumes.col_date">Date</option>
+        <option value="company" data-i18n="resumes.col_company">Company</option>
+        <option value="match_score" data-i18n="resumes.col_score">Score</option>
+        <option value="is_favorite" data-i18n="resumes.sort_favorites">Favorites first</option>
+      </select>
+      <button type="button" id="resume-compare-btn" class="btn btn-secondary" disabled
+              onclick="compareSelected()" data-i18n="resumes.compare">Compare</button>
+      <span id="resume-compare-info" class="text-muted" aria-live="polite"></span>
+    </div>
+
+    <!-- Resume list -->
+    <div id="resume-list" role="region" aria-label="Resume versions list" aria-live="polite">
+    </div>
+
+    <!-- Comparison overlay -->
+    <div id="resume-compare-overlay" class="resume-detail-overlay hidden" role="dialog" aria-label="Resume comparison">
+      <div class="resume-detail-header">
+        <button type="button" class="btn btn-secondary" onclick="closeCompareView()"
+                data-i18n="resumes.back_to_library">Back to Library</button>
+        <h3 data-i18n="resumes.compare_title">Resume Comparison</h3>
+      </div>
+      <div class="diff-legend" role="region" aria-label="Diff legend">
+        <span class="diff-label diff-added-label" data-i18n="resumes.diff_added">Added</span>
+        <span class="diff-label diff-removed-label" data-i18n="resumes.diff_removed">Removed</span>
+        <span class="diff-label diff-unchanged-label" data-i18n="resumes.diff_unchanged">Unchanged</span>
+      </div>
+      <div id="resume-compare-content" class="resume-compare-grid">
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div id="resume-pagination" class="resume-pagination" role="navigation" aria-label="Resume list pagination">
+    </div>
+
+    <!-- Detail overlay (hidden by default) -->
+    <div id="resume-detail-overlay" class="resume-detail-overlay hidden" role="dialog" aria-label="Resume detail">
+      <div class="resume-detail-header">
+        <button type="button" class="btn btn-secondary" onclick="closeResumeDetail()"
+                data-i18n="resumes.back_to_library">Back to Library</button>
+      </div>
+      <div id="resume-detail-content" class="resume-detail-body">
+      </div>
+    </div>
+  </div>
+
+  <!-- KNOWLEDGE BASE -->
+  <div class="screen hidden" id="screen-knowledge-base" role="tabpanel" aria-label="Knowledge Base">
+    <h2 data-i18n="kb.title">Knowledge Base</h2>
+
+    <!-- Stats cards -->
+    <div id="kb-stats" class="kb-stats-grid" role="region" aria-label="Knowledge Base statistics" aria-live="polite"></div>
+
+    <!-- Tools row: ATS + Resume Assembly side by side -->
+    <div class="kb-tools-grid">
+      <div class="card">
+        <h3 data-i18n="ats.title">ATS Compatibility Score</h3>
+        <div class="kb-tool-form">
+          <label data-i18n="ats.platform_label">ATS Platform
+            <select id="kb-ats-platform" class="form-input" aria-label="ATS platform profile">
+              <option value="default" data-i18n="ats.platform_default">Default (Balanced)</option>
+              <option value="greenhouse">Greenhouse</option>
+              <option value="lever">Lever</option>
+              <option value="workday">Workday</option>
+              <option value="ashby">Ashby</option>
+              <option value="icims">iCIMS</option>
+              <option value="taleo">Taleo</option>
+            </select>
+          </label>
+          <label>Job Description
+            <textarea id="kb-ats-jd" class="form-input" rows="3"
+                      placeholder="Paste a job description..."
+                      aria-label="Job description for ATS scoring"></textarea>
+          </label>
+          <div>
+            <button type="button" class="btn btn-primary btn-sm" onclick="analyzeATS()"
+                    data-i18n="ats.analyze_btn">Analyze</button>
+            <span id="kb-ats-status" aria-live="polite"></span>
+          </div>
+          <div id="kb-ats-result" role="region" aria-label="ATS scoring results" aria-live="polite"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="reuse.settings_title">Smart Resume Assembly</h3>
+        <p style="font-size:0.85em; color:var(--text-muted); margin-bottom:8px;">
+          AI generates a tailored resume using only your Knowledge Base data. No information is invented.
+        </p>
+        <div class="kb-tool-form">
+          <label>Job Description
+            <textarea id="kb-preview-jd" class="form-input" rows="3"
+                      placeholder="Paste a job description to generate a tailored resume..."
+                      aria-label="Job description for resume generation"></textarea>
+          </label>
+          <div>
+            <button type="button" class="btn btn-primary btn-sm" onclick="previewKBResume()">Generate Resume</button>
+            <span id="kb-preview-status" aria-live="polite"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview overlay -->
+    <div id="kb-preview-overlay" class="resume-detail-overlay hidden" role="dialog" aria-label="Resume preview">
+      <div class="kb-preview-content resume-detail-body"></div>
+    </div>
+
+    <!-- Bottom row: Resume Builder + Documents side by side -->
+    <div class="kb-bottom-grid">
+      <div class="card">
+        <h3 data-i18n="builder.title">Resume Builder</h3>
+        <p class="text-muted" data-i18n="builder.desc">Drag and drop KB entries to manually build a custom resume.</p>
+        <button type="button" class="btn btn-primary btn-sm" onclick="openResumeBuilder()"
+                data-i18n="builder.open_btn" aria-label="Open Resume Builder">Open Resume Builder</button>
+      </div>
+      <div class="card">
+        <h3>Uploaded Documents</h3>
+        <div class="kb-toolbar-upload" style="margin-bottom:12px;">
+          <input type="file" id="kb-upload-input" accept=".pdf,.docx,.txt,.md"
+                 aria-label="Choose document to upload" class="form-input">
+          <button type="button" class="btn btn-primary" onclick="uploadKBDocument()"
+                  data-i18n="kb.upload_title">Upload</button>
+          <div id="kb-upload-status" class="kb-upload-status" aria-live="polite"></div>
+        </div>
+        <div id="kb-documents-list" role="region" aria-label="Uploaded documents list"></div>
+      </div>
+    </div>
+
+    <!-- KB Entries Database -->
+    <div class="kb-toolbar">
+      <div></div>
+      <div class="kb-toolbar-filter">
+        <select id="kb-filter-category" class="form-input"
+                onchange="filterKBCategory(this.value)"
+                aria-label="Filter by category">
+          <option value="all" data-i18n="kb.filter_all">All Categories</option>
+          <option value="experience" data-i18n="kb.category_experience">Experience</option>
+          <option value="skill" data-i18n="kb.category_skill">Skills</option>
+          <option value="education" data-i18n="kb.category_education">Education</option>
+          <option value="project" data-i18n="kb.category_project">Projects</option>
+          <option value="certification" data-i18n="kb.category_certification">Certifications</option>
+          <option value="summary" data-i18n="kb.category_summary">Summary</option>
+        </select>
+        <input type="text" id="kb-search-input" class="form-input"
+               placeholder="Search entries..." aria-label="Search KB entries"
+               oninput="searchKB(this.value)">
+      </div>
+    </div>
+
+    <div id="kb-entries-list" role="region" aria-label="Knowledge Base entries" aria-live="polite">
+    </div>
+
+    <div id="kb-pagination" class="resume-pagination" role="navigation" aria-label="KB entries pagination">
+    </div>
+
+    <div id="kb-edit-overlay" class="resume-detail-overlay hidden" role="dialog" aria-label="Edit KB entry">
+      <div class="kb-edit-content resume-detail-body"></div>
+    </div>
+
+    <!-- Resume Builder Overlay -->
+    <div id="rb-overlay" class="resume-detail-overlay hidden" role="dialog" aria-modal="true" aria-label="Resume Builder">
+      <div class="rb-container">
+        <div class="rb-header">
+          <h2 data-i18n="builder.title">Resume Builder</h2>
+          <button type="button" class="btn btn-secondary" onclick="closeResumeBuilder()" aria-label="Close builder">&times;</button>
+        </div>
+
+        <div class="rb-layout">
+          <!-- Left panel: KB entries -->
+          <div class="rb-left-panel">
+            <h3 data-i18n="builder.kb_panel_title">Knowledge Base Entries</h3>
+            <div class="flex-row gap-sm" style="margin-bottom:8px;">
+              <select id="rb-kb-category" class="form-input" style="max-width:150px;" aria-label="Filter by category">
+                <option value="" data-i18n="kb.filter_all">All Categories</option>
+                <option value="experience" data-i18n="kb.category_experience">Experience</option>
+                <option value="skill" data-i18n="kb.category_skill">Skills</option>
+                <option value="education" data-i18n="kb.category_education">Education</option>
+                <option value="project" data-i18n="kb.category_project">Projects</option>
+                <option value="certification" data-i18n="kb.category_certification">Certifications</option>
+                <option value="summary" data-i18n="kb.category_summary">Summary</option>
+              </select>
+              <input type="text" id="rb-kb-search" class="form-input" placeholder="Search..." aria-label="Search KB entries">
+            </div>
+            <div id="rb-kb-entries" class="rb-entries-list" role="listbox" aria-label="Available KB entries"></div>
+          </div>
+
+          <!-- Right panel: Resume sections -->
+          <div class="rb-right-panel">
+            <h3 data-i18n="builder.resume_panel_title">Your Resume</h3>
+            <div class="rb-sections">
+              <div class="rb-section" data-section="summary">
+                <h4 data-i18n="kb.category_summary">Summary</h4>
+                <div id="rb-drop-summary" class="rb-drop-zone" data-section="summary" role="list" aria-label="Summary entries drop zone">
+                  <p class="text-muted rb-drop-placeholder" data-i18n="builder.drop_here">Drop entries here</p>
+                </div>
+              </div>
+              <div class="rb-section" data-section="experience">
+                <h4 data-i18n="kb.category_experience">Experience</h4>
+                <div id="rb-drop-experience" class="rb-drop-zone" data-section="experience" role="list" aria-label="Experience entries drop zone">
+                  <p class="text-muted rb-drop-placeholder" data-i18n="builder.drop_here">Drop entries here</p>
+                </div>
+              </div>
+              <div class="rb-section" data-section="skill">
+                <h4 data-i18n="kb.category_skill">Skills</h4>
+                <div id="rb-drop-skill" class="rb-drop-zone" data-section="skill" role="list" aria-label="Skills entries drop zone">
+                  <p class="text-muted rb-drop-placeholder" data-i18n="builder.drop_here">Drop entries here</p>
+                </div>
+              </div>
+              <div class="rb-section" data-section="education">
+                <h4 data-i18n="kb.category_education">Education</h4>
+                <div id="rb-drop-education" class="rb-drop-zone" data-section="education" role="list" aria-label="Education entries drop zone">
+                  <p class="text-muted rb-drop-placeholder" data-i18n="builder.drop_here">Drop entries here</p>
+                </div>
+              </div>
+              <div class="rb-section" data-section="project">
+                <h4 data-i18n="kb.category_project">Projects</h4>
+                <div id="rb-drop-project" class="rb-drop-zone" data-section="project" role="list" aria-label="Project entries drop zone">
+                  <p class="text-muted rb-drop-placeholder" data-i18n="builder.drop_here">Drop entries here</p>
+                </div>
+              </div>
+              <div class="rb-section" data-section="certification">
+                <h4 data-i18n="kb.category_certification">Certifications</h4>
+                <div id="rb-drop-certification" class="rb-drop-zone" data-section="certification" role="list" aria-label="Certification entries drop zone">
+                  <p class="text-muted rb-drop-placeholder" data-i18n="builder.drop_here">Drop entries here</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Page indicator + controls -->
+            <div class="rb-controls">
+              <div class="rb-page-row">
+                <span id="rb-page-indicator" class="rb-page-indicator" aria-live="polite" data-i18n="builder.page_empty">No entries selected</span>
+                <label class="rb-toggle-label">
+                  <input type="checkbox" id="rb-one-page-toggle"> <span data-i18n="builder.one_page_mode">One-page mode</span>
+                </label>
+              </div>
+              <div class="flex-row gap-sm" style="margin-top:8px;">
+                <label>Template
+                  <select id="rb-template-select" class="form-input" style="max-width:150px;" aria-label="Resume template">
+                    <option value="jake" selected>Jake (Default)</option>
+                    <option value="classic">Classic</option>
+                    <option value="modern">Modern</option>
+                    <option value="academic">Academic</option>
+                    <option value="minimal">Minimal</option>
+                  </select>
+                </label>
+              </div>
+              <div class="flex-row gap-sm" style="margin-top:12px; flex-wrap:wrap;">
+                <button type="button" class="btn btn-primary" onclick="previewBuilderResume()"
+                        data-i18n="builder.preview_btn">Preview PDF</button>
+                <button type="button" class="btn btn-secondary" onclick="document.getElementById('rb-autofill-section').classList.toggle('hidden')"
+                        data-i18n="builder.autofill_btn">Auto-Fill from JD</button>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <input type="text" id="rb-preset-name" class="form-input" style="max-width:200px;"
+                         placeholder="Preset name..." aria-label="Preset name">
+                  <button type="button" class="btn btn-secondary" onclick="savePreset()"
+                          data-i18n="builder.save_preset">Save Preset</button>
+                </div>
+                <span id="rb-preview-status" aria-live="polite"></span>
+              </div>
+            </div>
+
+            <!-- Auto-fill section (hidden by default) -->
+            <div id="rb-autofill-section" class="hidden" style="margin-top:12px;">
+              <textarea id="rb-autofill-jd" class="form-input" rows="3"
+                        placeholder="Paste a job description to auto-select best entries..."
+                        aria-label="Job description for auto-fill"></textarea>
+              <div style="margin-top:6px;">
+                <button type="button" class="btn btn-primary" onclick="autoFillFromJD()"
+                        data-i18n="builder.autofill_go">Auto-Fill</button>
+                <span id="rb-autofill-status" aria-live="polite"></span>
+              </div>
+            </div>
+
+            <!-- Preview iframe -->
+            <iframe id="rb-preview-iframe" class="hidden" style="width:100%; height:600px; margin-top:12px; border:1px solid var(--border);"
+                    title="Resume preview"></iframe>
+          </div>
+        </div>
+
+        <!-- Presets panel -->
+        <div class="rb-presets-panel" style="margin-top:16px;">
+          <h3 data-i18n="builder.presets_title">Saved Presets</h3>
+          <div id="rb-presets-list" role="list" aria-label="Saved resume presets"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SETTINGS -->
+  <div class="screen hidden" id="screen-settings">
+    <h2 data-i18n="settings.screen_title">Settings</h2>
+    <div class="card">
+      <div class="flex-col gap-lg">
+        <h3 data-i18n="settings.section_language">Language</h3>
+        <div class="settings-grid">
+          <div class="form-group">
+            <label for="set-locale" data-i18n="settings.label_language">Language</label>
+            <select class="form-control" id="set-locale" onchange="onLocaleChange()"
+                    aria-label="Select language"></select>
+          </div>
+        </div>
+        <hr>
+        <h3 data-i18n="settings.section_profile">Profile</h3>
+        <div class="settings-grid">
+          <div class="form-group">
+            <label data-i18n="form.first_name">First Name</label>
+            <input type="text" class="form-control" id="set-first-name">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.last_name">Last Name</label>
+            <input type="text" class="form-control" id="set-last-name">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.email">Email</label>
+            <input type="email" class="form-control" id="set-email">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.phone">Phone</label>
+            <div style="display:flex; gap:8px;">
+              <input type="text" class="form-control" id="set-phone-code" style="width:70px; flex-shrink:0;">
+              <input type="tel" class="form-control" id="set-phone" style="flex:1;">
+            </div>
+          </div>
+        </div>
+        <div class="settings-grid">
+          <div class="form-group">
+            <label data-i18n="form.address_line1">Address Line 1</label>
+            <input type="text" class="form-control" id="set-address1">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.address_line2">Address Line 2</label>
+            <input type="text" class="form-control" id="set-address2">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.city">City</label>
+            <input type="text" class="form-control" id="set-city">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.state">State</label>
+            <input type="text" class="form-control" id="set-state">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.zip_code">ZIP Code</label>
+            <input type="text" class="form-control" id="set-zip">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.country">Country</label>
+            <input type="text" class="form-control" id="set-country">
+          </div>
+        </div>
+        <div class="form-group">
+          <label data-i18n="form.bio">Bio</label>
+          <textarea class="form-control" id="set-bio" rows="3"></textarea>
+        </div>
+        <div class="settings-grid">
+          <div class="form-group">
+            <label data-i18n="form.linkedin_url">LinkedIn URL</label>
+            <input type="url" class="form-control" id="set-linkedin">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.portfolio_url">Portfolio URL</label>
+            <input type="url" class="form-control" id="set-portfolio">
+          </div>
+        </div>
+
+        <hr style="border:none; border-top:1px solid var(--border); margin:8px 0;">
+        <h3 data-i18n="settings.section_ai_provider">AI Provider</h3>
+        <p style="font-size:.85rem;color:var(--text-dim);margin-bottom:12px;" data-i18n="settings.ai_description">Configure an LLM API to generate tailored resumes and cover letters. Your API key is stored locally and never shared.</p>
+        <div class="settings-grid">
+          <div class="form-group">
+            <label data-i18n="settings.label_provider">Provider</label>
+            <select class="form-control" id="set-llm-provider" onchange="onLLMProviderChange()">
+              <option value="">-- Select --</option>
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openai">OpenAI (GPT)</option>
+              <option value="google">Google (Gemini)</option>
+              <option value="deepseek">DeepSeek</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Model <span style="font-size:.75rem;color:var(--text-dim)">(optional, uses default if blank)</span></label>
+            <input type="text" class="form-control" id="set-llm-model" placeholder="e.g. claude-sonnet-4-20250514" data-i18n-placeholder="placeholder.model">
+          </div>
+        </div>
+        <div class="form-group">
+          <label data-i18n="settings.label_api_key">API Key</label>
+          <div style="display:flex;gap:8px;">
+            <input type="password" class="form-control" id="set-llm-api-key" placeholder="sk-..." data-i18n-placeholder="placeholder.api_key" style="flex:1;">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="validateLLMKey()" id="btn-validate-key" data-i18n="button.validate">Validate</button>
+          </div>
+          <span id="llm-key-status" style="font-size:.8rem;margin-top:4px;display:block;"></span>
+        </div>
+
+        <hr style="border:none; border-top:1px solid var(--border); margin:8px 0;">
+        <h3 data-i18n="settings.section_job_preferences">Job Preferences</h3>
+        <div class="form-group">
+          <label data-i18n="form.job_titles">Job Titles</label>
+          <div class="tag-input-container">
+            <div class="tag-input-row">
+              <div class="tag-input-wrap" id="set-titles-tags" data-field="titles" data-placeholder="e.g. Software Engineer"></div>
+              <button type="button" class="tag-add-btn" onclick="addTagFromInput('set-titles-tags')" data-i18n="button.add_tag">Add</button>
+            </div>
+            <div class="tag-suggestions" data-for="set-titles-tags">
+              <button type="button" class="tag-suggestion" onclick="addTag('set-titles-tags','Software Engineer')">Software Engineer</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('set-titles-tags','Product Manager')">Product Manager</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('set-titles-tags','Data Scientist')">Data Scientist</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('set-titles-tags','Program Manager')">Program Manager</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('set-titles-tags','UX Designer')">UX Designer</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('set-titles-tags','DevOps Engineer')">DevOps Engineer</button>
+            </div>
+            <div class="form-hint" data-i18n="form.hint_titles">Add each title you'd like to search for. The bot searches all of them.</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label data-i18n="form.locations">Preferred Locations</label>
+          <div class="tag-input-container">
+            <div class="tag-input-row">
+              <div class="tag-input-wrap" id="set-locations-tags" data-field="locations" data-placeholder="e.g. New York, NY"></div>
+              <button type="button" class="tag-add-btn" onclick="addTagFromInput('set-locations-tags')" data-i18n="button.add_tag">Add</button>
+            </div>
+            <div class="tag-suggestions" data-for="set-locations-tags">
+              <button type="button" class="tag-suggestion" onclick="addTag('set-locations-tags','Remote')">Remote</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('set-locations-tags','United States')">United States</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('set-locations-tags','New York, NY')">New York, NY</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('set-locations-tags','San Francisco, CA')">San Francisco, CA</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('set-locations-tags','Austin, TX')">Austin, TX</button>
+              <button type="button" class="tag-suggestion" onclick="addTag('set-locations-tags','Seattle, WA')">Seattle, WA</button>
+            </div>
+            <div class="form-hint" data-i18n="form.hint_locations">Add cities or "Remote". The bot searches all locations.</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-md">
+          <span id="set-remote-label" style="font-weight:600; font-size:.9rem; color:var(--text-dim);" data-i18n="form.remote_only">Remote Only</span>
+          <label class="toggle-switch" for="set-remote">
+            <input type="checkbox" id="set-remote" role="switch" aria-labelledby="set-remote-label">
+            <span class="slider" aria-hidden="true"></span>
+          </label>
+        </div>
+        <div class="form-group">
+          <label data-i18n="form.salary_min">Minimum Salary</label>
+          <input type="number" class="form-control" id="set-salary" style="max-width:220px">
+        </div>
+        <div class="form-group">
+          <label data-i18n="form.keywords_include">Keywords to Include</label>
+          <div class="tag-input-container">
+            <div class="tag-input-row">
+              <div class="tag-input-wrap" id="set-include-tags" data-field="include_keywords" data-placeholder="e.g. Python, AWS"></div>
+              <button type="button" class="tag-add-btn" onclick="addTagFromInput('set-include-tags')" data-i18n="button.add_tag">Add</button>
+            </div>
+            <div class="form-hint" data-i18n="form.hint_include">Jobs must mention these keywords to pass the filter.</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label data-i18n="form.keywords_exclude">Keywords to Exclude</label>
+          <div class="tag-input-container">
+            <div class="tag-input-row">
+              <div class="tag-input-wrap" id="set-exclude-tags" data-field="exclude_keywords" data-placeholder="e.g. Intern, Unpaid"></div>
+              <button type="button" class="tag-add-btn" onclick="addTagFromInput('set-exclude-tags')" data-i18n="button.add_tag">Add</button>
+            </div>
+            <div class="form-hint" data-i18n="form.hint_exclude">Jobs with these keywords are automatically skipped.</div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label data-i18n="form.experience_levels">Experience Levels</label>
+          <div class="checkboxes-group">
+            <label><input type="checkbox" value="entry" class="set-exp-level"><span data-i18n="experience_levels.entry_short">Entry</span></label>
+            <label><input type="checkbox" value="mid" class="set-exp-level"><span data-i18n="experience_levels.mid_short">Mid</span></label>
+            <label><input type="checkbox" value="senior" class="set-exp-level"><span data-i18n="experience_levels.senior">Senior</span></label>
+            <label><input type="checkbox" value="lead" class="set-exp-level"><span data-i18n="experience_levels.lead_short">Lead</span></label>
+          </div>
+        </div>
+
+        <hr style="border:none; border-top:1px solid var(--border); margin:8px 0;">
+        <h3 data-i18n="settings.section_app_answers">Application Answers</h3>
+        <p style="color:var(--text-dim); font-size:.85rem; margin-bottom:12px;" data-i18n="settings.answers_description">
+          Pre-fill answers for common application questions (Workday, Ashby, etc.). These are used automatically when the bot encounters matching questions.
+        </p>
+        <div class="settings-grid">
+          <div class="form-group">
+            <label data-i18n="form.work_authorization">Work Authorization</label>
+            <select class="form-control" id="set-work-authorization">
+              <option value="">— Select —</option>
+              <option value="Yes">Yes — authorized to work</option>
+              <option value="No">No — not authorized</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.visa_sponsorship">Visa Sponsorship Needed?</label>
+            <select class="form-control" id="set-visa-sponsorship">
+              <option value="">— Select —</option>
+              <option value="Yes">Yes — need sponsorship</option>
+              <option value="No">No — don't need sponsorship</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.years_experience">Years of Experience</label>
+            <input type="text" class="form-control" id="set-years-experience" placeholder="e.g. 5" data-i18n-placeholder="placeholder.years_exp">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.desired_salary">Desired Salary</label>
+            <input type="text" class="form-control" id="set-desired-salary" placeholder="e.g. 150000" data-i18n-placeholder="placeholder.salary">
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.willing_relocate">Willing to Relocate?</label>
+            <select class="form-control" id="set-willing-relocate">
+              <option value="">— Select —</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label data-i18n="form.start_date">Earliest Start Date</label>
+            <input type="text" class="form-control" id="set-start-date" placeholder="e.g. Immediately, 2 weeks" data-i18n-placeholder="placeholder.start_date">
+          </div>
+        </div>
+        <details style="margin-top:8px;">
+          <summary style="cursor:pointer; font-weight:600; font-size:.9rem; color:var(--text-dim);" data-i18n="settings.section_eeo">EEO / Voluntary Disclosures (optional)</summary>
+          <div class="settings-grid" style="margin-top:8px;">
+            <div class="form-group">
+              <label data-i18n="form.gender">Gender</label>
+              <select class="form-control" id="set-eeo-gender">
+                <option value="">— Prefer not to say —</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+                <option value="Non-Binary">Non-Binary</option>
+                <option value="Decline to Self Identify">Decline to Self Identify</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label data-i18n="form.ethnicity">Ethnicity</label>
+              <select class="form-control" id="set-eeo-ethnicity">
+                <option value="">— Prefer not to say —</option>
+                <option value="Hispanic or Latino">Hispanic or Latino</option>
+                <option value="White">White (Not Hispanic or Latino)</option>
+                <option value="Black or African American">Black or African American</option>
+                <option value="Asian">Asian</option>
+                <option value="Native Hawaiian or Other Pacific Islander">Native Hawaiian or Pacific Islander</option>
+                <option value="American Indian or Alaska Native">American Indian or Alaska Native</option>
+                <option value="Two or More Races">Two or More Races</option>
+                <option value="Decline to Self Identify">Decline to Self Identify</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label data-i18n="form.veteran_status">Veteran Status</label>
+              <select class="form-control" id="set-eeo-veteran">
+                <option value="">— Prefer not to say —</option>
+                <option value="I am a veteran">I am a veteran</option>
+                <option value="I am not a veteran">I am not a veteran</option>
+                <option value="Decline to Self Identify">Decline to Self Identify</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label data-i18n="form.disability_status">Disability Status</label>
+              <select class="form-control" id="set-eeo-disability">
+                <option value="">— Prefer not to say —</option>
+                <option value="Yes, I have a disability">Yes, I have a disability</option>
+                <option value="No, I don't have a disability">No, I don't have a disability</option>
+                <option value="I don't wish to answer">I don't wish to answer</option>
+              </select>
+            </div>
+          </div>
+        </details>
+
+        <hr style="border:none; border-top:1px solid var(--border); margin:8px 0;">
+        <h3 data-i18n="settings.section_platform_login">Platform Login</h3>
+        <p style="color:var(--text-dim); font-size:.85rem; margin-bottom:12px;" data-i18n="settings.login_description">
+          Open a browser to log into your job platforms. Your login session is saved so the bot can apply on your behalf.
+        </p>
+        <div class="flex-col gap-sm">
+          <div class="flex items-center gap-md" style="flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" id="settings-linkedin-login" onclick="openLoginBrowser('https://www.linkedin.com/login')" data-i18n="settings.open_linkedin_login">Open LinkedIn Login</button>
+            <span id="linkedin-session-status" class="status-badge" style="font-size:.8rem;"><span class="dot dot-gray"></span> Not connected</span>
+          </div>
+          <div class="flex items-center gap-md" style="flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" id="settings-indeed-login" onclick="openLoginBrowser('https://secure.indeed.com/auth')" data-i18n="settings.open_indeed_login">Open Indeed Login</button>
+            <span id="indeed-session-status" class="status-badge" style="font-size:.8rem;"><span class="dot dot-gray"></span> Not connected</span>
+          </div>
+          <button class="btn btn-ghost btn-sm hidden" id="settings-close-browser" onclick="closeLoginBrowser()" style="align-self:flex-start;" data-i18n="button.close_browser">Close Browser</button>
+        </div>
+
+        <hr style="border:none; border-top:1px solid var(--border); margin:8px 0;">
+        <h3 data-i18n="settings.section_schedule">Schedule</h3>
+        <p style="color:var(--text-dim); font-size:.85rem; margin-bottom:8px;" data-i18n="settings.schedule_description">
+          Auto-start and stop the bot on a time schedule. When enabled, the bot runs only during the configured days and time window.
+        </p>
+        <div class="flex items-center gap-md" style="margin-bottom:12px;">
+          <span id="schedule-enabled-label" style="font-weight:600; font-size:.9rem; color:var(--text-dim);" data-i18n="schedule.enable_schedule">Enable Schedule</span>
+          <label class="toggle-switch" for="set-schedule-enabled">
+            <input type="checkbox" id="set-schedule-enabled" role="switch" aria-labelledby="schedule-enabled-label">
+            <span class="slider" aria-hidden="true"></span>
+          </label>
+          <span id="schedule-status-badge" class="hidden" style="font-size:.8rem; padding:2px 10px; border-radius:12px; background:var(--success); color:#000; font-weight:600;" data-i18n="schedule.active">Active</span>
+        </div>
+        <div id="schedule-fields">
+          <div class="form-group">
+            <label data-i18n="schedule.days_of_week">Days of Week</label>
+            <div class="checkboxes-group">
+              <label><input type="checkbox" value="mon" class="set-schedule-day"><span data-i18n="schedule.mon">Mon</span></label>
+              <label><input type="checkbox" value="tue" class="set-schedule-day"><span data-i18n="schedule.tue">Tue</span></label>
+              <label><input type="checkbox" value="wed" class="set-schedule-day"><span data-i18n="schedule.wed">Wed</span></label>
+              <label><input type="checkbox" value="thu" class="set-schedule-day"><span data-i18n="schedule.thu">Thu</span></label>
+              <label><input type="checkbox" value="fri" class="set-schedule-day"><span data-i18n="schedule.fri">Fri</span></label>
+              <label><input type="checkbox" value="sat" class="set-schedule-day"><span data-i18n="schedule.sat">Sat</span></label>
+              <label><input type="checkbox" value="sun" class="set-schedule-day"><span data-i18n="schedule.sun">Sun</span></label>
+            </div>
+          </div>
+          <div class="settings-grid">
+            <div class="form-group">
+              <label data-i18n="schedule.start_time">Start Time</label>
+              <input type="time" class="form-control" id="set-schedule-start" value="09:00">
+            </div>
+            <div class="form-group">
+              <label data-i18n="schedule.end_time">End Time</label>
+              <input type="time" class="form-control" id="set-schedule-end" value="17:00">
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <button class="btn btn-success" onclick="saveSettings()" data-i18n="button.save_settings">Save Settings</button>
+          <span id="settings-saved-msg" class="hidden" style="margin-left:12px; color:var(--success); font-weight:600;">Saved!</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ════════════════════════════════════════════════════════════════
+     MODALS
+     ════════════════════════════════════════════════════════════════ -->
+
+<!-- Cover Letter Modal -->
+<div class="modal-overlay hidden" id="modal-cover-letter">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="modal-cl-title">
+    <button class="modal-close" onclick="closeModal('modal-cover-letter')" aria-label="Close dialog">&times;</button>
+    <h3 id="modal-cl-title" data-i18n="modal.cover_letter_title">Cover Letter</h3>
+    <div id="modal-cover-letter-content" style="white-space:pre-wrap; line-height:1.7; font-size:.92rem; color:var(--text);"></div>
+  </div>
+</div>
+
+<!-- Application Detail Modal -->
+<div class="modal-overlay hidden" id="modal-app-detail">
+  <div class="modal-box" style="max-width:720px;" role="dialog" aria-modal="true" aria-label="Application details">
+    <button class="modal-close" onclick="closeModal('modal-app-detail')" aria-label="Close dialog">&times;</button>
+    <div id="app-detail-content">
+      <div class="text-center text-dim" style="padding:30px;" data-i18n="modal.loading">Loading...</div>
+    </div>
+  </div>
+</div>
+
+<!-- File Edit Modal -->
+<div class="modal-overlay hidden" id="modal-file-edit">
+  <div class="modal-box" style="max-width:700px;" role="dialog" aria-modal="true" aria-labelledby="modal-file-title">
+    <button class="modal-close" onclick="closeModal('modal-file-edit')" aria-label="Close dialog">&times;</button>
+    <h3 id="modal-file-title" data-i18n="modal.new_file_title">New Experience File</h3>
+    <div class="flex-col gap-md">
+      <div class="form-group">
+        <label for="modal-file-name" data-i18n="form.filename">Filename</label>
+        <input type="text" class="form-control" id="modal-file-name" placeholder="e.g. work_experience.txt" data-i18n-placeholder="placeholder.filename">
+      </div>
+      <div class="form-group">
+        <label for="modal-file-content" data-i18n="form.content">Content</label>
+        <textarea class="form-control" id="modal-file-content" rows="14" placeholder="Enter your experience details..." data-i18n-placeholder="placeholder.file_content"></textarea>
+      </div>
+      <div class="flex gap-sm">
+        <button class="btn btn-success" onclick="saveFile()" data-i18n="button.save">Save</button>
+        <button class="btn btn-ghost" onclick="closeModal('modal-file-edit')" data-i18n="button.cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-overlay hidden" id="modal-confirm-delete">
+  <div class="modal-box" style="max-width:400px; text-align:center;" role="alertdialog" aria-modal="true" aria-labelledby="modal-delete-title" aria-describedby="modal-delete-desc">
+    <h3 id="modal-delete-title" data-i18n="modal.confirm_delete_title">Delete File?</h3>
+    <p class="text-dim" id="modal-delete-desc" style="margin:12px 0 24px;" data-i18n="modal.confirm_delete_desc">This action cannot be undone.</p>
+    <div class="flex gap-sm" style="justify-content:center;">
+      <button class="btn btn-danger" id="btn-confirm-delete" data-i18n="button.delete">Delete</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-confirm-delete')" data-i18n="button.cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- API token injection + ES module entry point -->
+<script>window.__apiToken = "{{ api_token }}";</script>
+<script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

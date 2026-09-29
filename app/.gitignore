@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific
+*.db
+*.db-journal
+browser_profile/
+profile/resumes/
+profile/cover_letters/
+
+# Environment / secrets
+.env
+*.pem
+*.key
+
+# Test / Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+cov_*.txt
+test_*.txt
+*_results.txt
+*_output.txt
+*_stderr.txt
+
+# Playwright
+playwright-report/
+test-results/
+
+# Node / Electron
+node_modules/
+electron/build/
+electron/dist/
+
+# Claude Code memory (session-specific)
+.claude/projects/
