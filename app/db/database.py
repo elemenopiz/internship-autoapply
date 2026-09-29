@@ -13,7 +13,7 @@ from pathlib import Path
 from db.models import Application, FeedEvent
 
 # Outcomes that end a job's lifecycle — see Database.is_done.
-TERMINAL_STATUSES = ("applied", "submitted_unconfirmed", "unsupported")
+TERMINAL_STATUSES = ("applied", "submitted_unconfirmed", "unsupported", "site_blocked")
 MAX_ATTEMPTS = 3
 
 SCHEMA_SQL = """

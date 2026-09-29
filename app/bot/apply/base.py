@@ -43,6 +43,8 @@ class ApplyResult:
     # Submit was clicked but no confirmation was detected. Never retried —
     # a retry could file a duplicate application.
     submitted_unconfirmed: bool = False
+    # The ATS explicitly rejected the submission as spam; stop this posting.
+    site_blocked: bool = False
 
     @property
     def status(self) -> str:
@@ -51,6 +53,8 @@ class ApplyResult:
             return "applied"
         if self.submitted_unconfirmed:
             return "submitted_unconfirmed"
+        if self.site_blocked:
+            return "site_blocked"
         if self.held_for_answers:
             return "needs_answers"
         if self.manual_required:
@@ -110,7 +114,8 @@ class BaseApplier(ABC):
                 # Don't retry on non-transient results — and never after a
                 # submit click (submitted_unconfirmed) or a deliberate hold.
                 if (result.success or result.captcha_detected or result.manual_required
-                        or result.held_for_answers or result.submitted_unconfirmed):
+                        or result.held_for_answers or result.submitted_unconfirmed
+                        or result.site_blocked):
                     return result
 
                 last_result = result

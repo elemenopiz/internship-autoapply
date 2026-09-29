@@ -46,7 +46,7 @@ export async function loadApplications() {
         <td><span class="match-pct" style="color:${matchColor(a.match_score)}">${a.match_score != null ? a.match_score + '%' : '--'}</span></td>
         <td class="no-row-click">
           <select data-status-id="${a.id}" aria-label="Status for ${escAttr(a.job_title || '')}">
-            ${['applied','interview','rejected','offer','withdrawn','error','manual_required'].map(s =>
+            ${['applied','interview','rejected','offer','withdrawn','error','manual_required','site_blocked'].map(s =>
               `<option value="${s}" ${a.status === s ? 'selected' : ''}>${t('status.' + s)}</option>`
             ).join('')}
           </select>
@@ -114,7 +114,7 @@ export async function viewApplicationDetail(id) {
     const events = await eventsRes.json();
     if (app.error) { content.innerHTML = `<div class="text-dim">${escHtml(app.error)}</div>`; return; }
 
-    const statusOptions = ['applied','interview','rejected','offer','withdrawn','error','manual_required'];
+    const statusOptions = ['applied','interview','rejected','offer','withdrawn','error','manual_required','site_blocked'];
     const fmtDate = d => d ? new Date(d).toLocaleString() : '--';
 
     let timeline = '';

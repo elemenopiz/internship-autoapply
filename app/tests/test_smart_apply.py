@@ -374,7 +374,8 @@ class TestRetrySemantics:
 
     def test_terminal_statuses_are_done_immediately(self, tmp_path):
         db = Database(tmp_path / "t.db")
-        for ext, status in (("x", "applied"), ("y", "submitted_unconfirmed"), ("z", "unsupported")):
+        for ext, status in (("x", "applied"), ("y", "submitted_unconfirmed"),
+                            ("z", "unsupported"), ("w", "site_blocked")):
             _record(db, ext, status)
             assert db.is_done(ext, "workbook")
 
@@ -520,3 +521,12 @@ class TestEndToEnd:
         result, _, _ = _run(browser, tmp_path, _FORM.format(on_submit="", extra=""))
         assert result.submitted_unconfirmed and not result.success
         assert result.status == "submitted_unconfirmed"
+
+    def test_site_spam_rejection_stops_retry(self, browser, tmp_path):
+        rejected = "document.body.insertAdjacentHTML('beforeend', " \
+                   "'<div role=alert>Your application submission was " \
+                   "flagged as possible spam.</div>');"
+        result, _, _ = _run(browser, tmp_path, _FORM.format(on_submit=rejected, extra=""))
+        assert result.site_blocked and not result.success
+        assert result.status == "site_blocked"
+        assert result.attempts == 1

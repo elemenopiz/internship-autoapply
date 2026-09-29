@@ -1048,6 +1048,10 @@ class SmartApplier(BaseApplier):
                 return ApplyResult(success=False, captcha_detected=True,
                                    error_message=f"CAPTCHA challenge appeared on submit ({reason})")
             errors = self._form_errors()
+            if any("flagged as possible spam" in error.lower() for error in errors):
+                return ApplyResult(success=False, site_blocked=True,
+                                   error_message="Application rejected by site spam filter: "
+                                   + " | ".join(errors)[:300])
         if reason == "Turnstile":
             return ApplyResult(success=False, captcha_detected=True,
                                error_message="A Turnstile check appeared on submit and did not pass")

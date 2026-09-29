@@ -40,5 +40,5 @@ SAFE_FILENAME_RE = re.compile(r"^[a-zA-Z0-9_\- ]+\.txt$")
 VALID_APP_STATUSES = {
     "applied", "manual_required", "error", "skipped", "saved",
     "reviewed", "interview", "interviewed", "interviewing",
-    "rejected", "accepted", "withdrawn", "offer",
+    "rejected", "accepted", "withdrawn", "offer", "site_blocked",
 }

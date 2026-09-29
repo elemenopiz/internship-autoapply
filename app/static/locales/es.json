@@ -382,7 +382,8 @@
     "offer": "Oferta",
     "withdrawn": "Retirada",
     "error": "Error",
-    "manual_required": "Requiere Acción Manual"
+    "manual_required": "Requiere Acción Manual",
+    "site_blocked": "Bloqueada por el sitio"
   },
 
   "schedule": {

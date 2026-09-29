@@ -382,7 +382,8 @@
     "offer": "Offer",
     "withdrawn": "Withdrawn",
     "error": "Error",
-    "manual_required": "Manual Required"
+    "manual_required": "Manual Required",
+    "site_blocked": "Site Blocked"
   },
 
   "schedule": {
