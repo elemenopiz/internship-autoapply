@@ -93,7 +93,8 @@ class TestIsTargetInternship:
         assert not is_target_internship(_Job("Marketing Intern", description="Spring 2027"))
 
     @pytest.mark.parametrize("title", ["Growth Engineer Intern", "Data Scientist Intern",
-                                       "Software Developer Intern"])
+                                       "Software Developer Intern", "Process Engineer Intern",
+                                       "Quantitative Trading Analyst Intern"])
     def test_engineering_roles_excluded(self, title):
         assert not is_target_internship(_Job(title))
 
@@ -111,6 +112,11 @@ class TestIsTargetInternship:
 class TestMissingProfileFields:
     def test_complete_config_is_ready(self, tmp_path):
         assert missing_profile_fields(_config(tmp_path)) == []
+
+    def test_anywhere_location_is_ready(self, tmp_path):
+        config = _config(tmp_path)
+        config.search_criteria.locations = []
+        assert missing_profile_fields(config) == []
 
     def test_missing_api_key_blocks(self, tmp_path):
         assert missing_profile_fields(_config(tmp_path, api_key="")) == [

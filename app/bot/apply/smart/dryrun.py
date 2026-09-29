@@ -45,8 +45,7 @@ def _workbook_jobs(limit: int) -> list[_Raw]:
     from core.internship_policy import is_target_internship
 
     jobs = [j for j in WorkbookSearcher().search(None)
-            if detect_ats(j.apply_url) in SMART_PLATFORMS]
-    jobs.sort(key=lambda j: not is_target_internship(j))  # in-scope roles first
+            if is_target_internship(j) and detect_ats(j.apply_url) in SMART_PLATFORMS]
     return [_Raw(j.title, j.company, j.apply_url) for j in jobs[:limit]]
 
 

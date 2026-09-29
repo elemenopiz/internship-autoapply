@@ -36,6 +36,7 @@ EXCLUDED_ROLE_TERMS = (
     "software engineer", "software developer", "engineer intern", "engineering intern",
     "developer", "machine learning", "scientist", "hardware", "firmware", "mechanical",
     "electrical", "civil engineer", "chemical engineer",
+    "process engineer", "quantitative trading",
 )
 
 _CO_OP = re.compile(r"\bco-?\s?op\b|\bcoop\b")
@@ -82,7 +83,6 @@ def missing_profile_fields(config) -> list[str]:
         "graduation month/year": answers.get("graduation_date"),
         "work authorization": answers.get("work_authorization"),
         "visa sponsorship": answers.get("visa_sponsorship"),
-        "preferred locations": config.search_criteria.locations,
         _llm_key_label(config.llm.provider): config.llm.provider and config.llm.api_key,
     }
     missing = [name for name, value in required.items() if not value]

@@ -12,11 +12,11 @@ The current search is aimed at product management, technical program management,
 4. Fill in the profile fields and screening answers in the dashboard. Answers are saved locally and reused on later applications.
 5. Run `launch.ps1`.
 
-The app starts in `full_auto` mode with a five-application daily cap. Schedule is disabled until the profile is complete. Enable it from the dashboard after the first successful dry run.
+The app starts in `full_auto` mode with a 50-application daily cap. The schedule is currently disabled. Confirm the saved profile and screening answers, complete a dry run against relevant live postings, and then enable scheduling from the dashboard.
 
 ## Safety gates
 
-The applier refuses to start (and `check_ready.ps1` lists what is missing) until the profile fields, a resume PDF, and `OPENAI_API_KEY` are all present. It never invents background: tailored documents are generated only from the experience files in `data/profile/experiences` (or the knowledge base built from an uploaded resume). If neither exists, it falls back to your own uploaded resume. The five-per-day cap is counted from the local database by calendar day, so restarting the app does not reset it. A key supplied through `OPENAI_API_KEY` is never copied into `config.json` or the Windows credential store, so replacing the variable with `set_openai_key.ps1` always takes effect.
+The applier refuses to start (and `check_ready.ps1` lists what is missing) until the profile fields, a resume PDF, and `OPENAI_API_KEY` are all present. An empty preferred-locations list means anywhere; the configured countries still limit the search. It never invents background: tailored documents are generated only from the experience files in `data/profile/experiences` (or the knowledge base built from an uploaded resume). If neither exists, it falls back to your own uploaded resume. The 50-per-day cap is counted from the local database by calendar day, so restarting the app does not reset it. A key supplied through `OPENAI_API_KEY` is never copied into `config.json` or the Windows credential store, so replacing the variable with `set_openai_key.ps1` always takes effect.
 
 Screening answers are saved locally and reused on later applications. Review them in the dashboard before running the applier.
 

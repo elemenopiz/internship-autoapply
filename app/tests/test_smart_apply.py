@@ -99,6 +99,7 @@ class TestResolve:
         assert resolve(q("Last Name"), c).value == "User"
         assert resolve(q("Email"), c).value == "test.user@example.com"
         assert resolve(q("Phone"), c).value == "512-555-0100"
+        assert resolve(q("Phone", input_type="number"), c).value == "5125550100"
         assert resolve(q("Full name"), c).value == "Test User"
 
     def test_company_name_is_not_the_candidate_name(self):

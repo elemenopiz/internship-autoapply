@@ -222,7 +222,8 @@ def _identity(q: Question, hay: str, cand: Candidate) -> Resolution | None:
             if not picked and not q.options and q.kind == "combobox" and _is_us(p.country):
                 picked = "United States"  # searchable country-code picker
             return Resolution(picked, "profile.phone_country", "fact") if picked else None
-        return Resolution(_format_phone(p.phone), "profile.phone", "fact")
+        phone = re.sub(r"\D", "", p.phone) if q.input_type == "number" else _format_phone(p.phone)
+        return Resolution(phone, "profile.phone", "fact")
     if _has(hay, "linkedin"):
         return Resolution(p.linkedin_url or None, "profile.linkedin_url", "fact")
     if _has(hay, "github"):
