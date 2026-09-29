@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+<h1>Profile</h1>
+<p class="muted">Everything the applier types into forms comes from here. Fields marked * are required before it can run.</p>
+<form class="card" data-api="/api/profile" data-method="PUT" novalidate>
+  {% for title, fields in sections %}
+  <fieldset>
+    <legend>{{ title }}</legend>
+    <div class="grid">
+    {% for name, label, kind, help in fields %}
+      {% if kind == "tri" %}{{ m.tri(name, label, profile[name], help) }}
+      {% else %}{{ m.field(name, label, profile[name], kind, help) }}{% endif %}
+    {% endfor %}
+    </div>
+  </fieldset>
+  {% endfor %}
+  <fieldset>
+    <legend>Voluntary self-identification (EEO)</legend>
+    <p class="muted">Default is "decline": the applier picks the site's "prefer not to say" option. Enter a specific answer only if you want it disclosed.</p>
+    <div class="grid">
+    {% for name, label, kind, help in eeo_fields %}
+      <div class="field">
+        <label for="f-eeo-{{ name }}">{{ label }}</label>
+        <input id="f-eeo-{{ name }}" name="eeo.{{ name }}" type="text" value="{{ profile.eeo[name] }}" maxlength="100" list="eeo-choices">
+      </div>
+    {% endfor %}
+    </div>
+    <datalist id="eeo-choices"><option value="decline"></datalist>
+  </fieldset>
+  <fieldset>
+    <legend>Resume file (advanced)</legend>
+    {{ m.field("fallback_resume_path", "Path to your resume PDF", profile.fallback_resume_path, "text", "Set automatically when you upload on the Resume page.", 500) }}
+  </fieldset>
+  {{ m.form_footer("Save profile") }}
+</form>
+
+<form class="card" data-api="/api/settings" data-method="PUT" novalidate>
+  <h2>Authorise certification boxes</h2>
+  <div class="field field-check">
+    <label><input type="checkbox" name="apply.attestations_authorized"{% if attest %} checked{% endif %}> I authorise the applier to tick certification, consent and signature boxes for me.</label>
+    <small class="help">Many applications end with statements such as "I certify that the information is true" or "I agree to the terms". If you tick this, the applier will check those boxes and type your full name as the electronic signature, on every application, without asking. You remain responsible for the accuracy of your profile and saved answers. Leave it off and those applications stop for you to finish by hand.</small>
+  </div>
+  {{ m.form_footer("Save authorisation") }}
+</form>
+{% endblock %}

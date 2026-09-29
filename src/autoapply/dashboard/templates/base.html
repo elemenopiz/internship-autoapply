@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf-token" content="{{ csrf_token }}">
+<title>{% block title %}Dashboard{% endblock %} - AutoApply</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/app.js" defer></script>
+</head>
+<body data-page="{{ page }}" data-tz="{{ tz }}">
+<a class="skip" href="#main">Skip to content</a>
+<header class="topbar">
+  <span class="brand">AutoApply</span>
+  <nav aria-label="Main">
+    <ul>
+      {% for key, href, label in nav %}
+      <li><a href="{{ href }}"{% if key == page %} aria-current="page"{% endif %}>{{ label }}</a></li>
+      {% endfor %}
+    </ul>
+  </nav>
+</header>
+<main id="main">
+  <div id="stop-banner" class="banner banner-danger" role="status"{% if not stop_active %} hidden{% endif %}>
+    <strong>STOP is active.</strong> No new application will start.
+    <button type="button" class="btn" data-action="unstop">Resume</button>
+  </div>
+  {% if risky_platforms %}
+  <div class="banner banner-warn" role="note" id="risk-banner">
+    <strong>Automation risk ({{ risky_platforms|join(" and ")|title }}).</strong> {{ risk_message }}
+  </div>
+  {% endif %}
+  <div id="flash" class="flash" role="status" aria-live="polite" hidden></div>
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Opportunities{% endblock %}
+{% block content %}
+<h1>Opportunities</h1>
+<form class="card filters" method="get" action="/opportunities">
+  <div class="grid">
+    <div class="field"><label for="q-search">Company or title</label><input id="q-search" name="search" value="{{ form.search }}" maxlength="200"></div>
+    <div class="field"><label for="q-min">Min score</label><input id="q-min" name="min_score" type="number" min="0" max="100" value="{{ form.min_score }}"></div>
+    <div class="field"><label for="q-status">Application status</label>
+      <select id="q-status" name="status"><option value="">Any</option><option value="unapplied"{% if form.status == "unapplied" %} selected{% endif %}>Not applied</option>
+      {% for s in statuses %}<option value="{{ s }}"{% if form.status == s %} selected{% endif %}>{{ s|status_label }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="q-source">Source</label>
+      <select id="q-source" name="source"><option value="">Any</option>{% for s in sources %}<option value="{{ s }}"{% if form.source == s %} selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+    <div class="field field-check"><label><input type="checkbox" name="passed_only" value="1"{% if form.passed_only %} checked{% endif %}> Passed only</label></div>
+  </div>
+  <button type="submit" class="btn btn-primary">Filter</button>
+</form>
+{% for p in problems %}<p class="warn">{{ p }}</p>{% endfor %}
+<div class="table-wrap">
+<table class="table" id="opportunities-table">
+  <thead><tr><th>Score</th><th>Company</th><th>Role</th><th>Location</th><th>Source</th><th>Why</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for o in items %}
+    <tr data-opportunity-id="{{ o.id }}">
+      <td>{% if o.score %}<strong>{{ o.score.score|round(1) }}</strong> {% if o.score.passed %}<span class="badge badge-ok">passed</span>{% else %}<span class="badge badge-skipped">below</span>{% endif %}{% else %}<span class="muted">unscored</span>{% endif %}</td>
+      <td>{{ o.company }}</td>
+      <td>{% set link = o.url|safe_url %}{% if link %}<a href="{{ link }}" target="_blank" rel="noopener noreferrer">{{ o.title }}</a>{% else %}{{ o.title }}{% endif %}
+          {% if not o.is_open %}<span class="badge badge-skipped">closed</span>{% endif %}</td>
+      <td>{{ o.location or "" }}</td>
+      <td>{{ o.source }}{% if o.ats != "unknown" %} / {{ o.ats }}{% endif %}</td>
+      <td>{% if o.score %}<ul class="reasons">{% for r in o.score.reasons %}<li>{{ r }}</li>{% endfor %}{% for r in o.score.penalties %}<li class="penalty">{{ r }}</li>{% endfor %}</ul>{% endif %}</td>
+      <td>{% if o.latest_application %}{{ m.badge(o.latest_application.status) }}{% else %}<span class="muted">not applied</span>{% endif %}</td>
+      <td>{% if not o.latest_application or o.latest_application.status not in ("submitted", "submitted_unconfirmed") %}<button type="button" class="btn" data-action="mark-applied" data-opportunity-id="{{ o.id }}">Mark applied manually</button>{% endif %}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="8" class="muted">No opportunities match. Run "Discover only" from the Overview to fetch some.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{{ m.pager(prev_url, next_url, offset, limit, total) }}
+{% endblock %}

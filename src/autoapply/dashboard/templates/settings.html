@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<h1>Settings</h1>
+<form class="card" data-api="/api/settings" data-method="PUT" novalidate>
+  <h2>Run behaviour</h2>
+  <div class="grid">
+    <div class="field"><label for="s-mode">Mode</label>
+      <select id="s-mode" name="mode">{% for x in modes %}<option value="{{ x }}"{% if x == cfg.mode %} selected{% endif %}>{{ x }}</option>{% endfor %}</select>
+      <small class="help">full_auto submits; dry_run fills forms but never submits; discover_only never opens a form.</small></div>
+    {{ m.number("daily_cap", "Daily cap (0-50)", cfg.daily_cap, 0, 50, "Counted by calendar day in your timezone.") }}
+    <div class="field"><label for="s-tz">Timezone</label>
+      <input id="s-tz" name="timezone" list="tz-list" value="{{ cfg.timezone }}" maxlength="64">
+      <datalist id="tz-list">{% for z in timezones %}<option value="{{ z }}">{% endfor %}</datalist></div>
+  </div>
+  <h3>Schedule</h3>
+  <div class="grid">
+    {{ m.check("schedule.enabled", "Run on a schedule", cfg.schedule.enabled, "Turning this on needs a complete readiness checklist.") }}
+    {{ m.lines("schedule.run_times", "Run times (HH:MM, one per line)", cfg.schedule.run_times, "", 2) }}
+    {{ m.number("schedule.jitter_minutes", "Random jitter (minutes)", cfg.schedule.jitter_minutes, 0, 120) }}
+    <fieldset class="field"><legend>Days</legend>
+      {% for d in weekdays %}<label class="inline"><input type="checkbox" name="schedule.days_of_week" data-type="multi-int" value="{{ loop.index0 }}"{% if loop.index0 in cfg.schedule.days_of_week %} checked{% endif %}> {{ d }}</label> {% endfor %}
+    </fieldset>
+  </div>
+  <h3>Browser and pacing</h3>
+  <div class="grid">
+    {{ m.check("apply.headless", "Run the browser hidden (headless)", cfg.apply.headless) }}
+    {{ m.check("apply.generic_portal", "Try employer-specific portals with the generic filler", cfg.apply.generic_portal) }}
+    <div class="field"><label for="s-shots">Screenshots</label>
+      <select id="s-shots" name="apply.screenshots">{% for x in ("never", "on_failure", "always") %}<option value="{{ x }}"{% if x == cfg.apply.screenshots %} selected{% endif %}>{{ x }}</option>{% endfor %}</select></div>
+    {{ m.number("apply.min_delay_s", "Minimum delay between applications (s)", cfg.apply.min_delay_s, 0, 3600) }}
+    {{ m.number("apply.max_delay_s", "Maximum delay (s)", cfg.apply.max_delay_s, 0, 7200) }}
+    {{ m.number("apply.nav_timeout_s", "Page load timeout (s)", cfg.apply.nav_timeout_s, 5, 300) }}
+    {{ m.number("apply.attempt_timeout_s", "Timeout per application (s)", cfg.apply.attempt_timeout_s, 60, 3600) }}
+    {{ m.number("apply.max_attempts_per_job", "Max attempts per job", cfg.apply.max_attempts_per_job, 1, 10) }}
+    {{ m.number("apply.max_attempts_per_run", "Max attempts per run", cfg.apply.max_attempts_per_run, 1, 100) }}
+  </div>
+  <h3>Email verification (optional)</h3>
+  <p class="muted">Lets the applier read verification emails. The mailbox app password is stored only in the OS credential store; this page never handles it.</p>
+  <div class="grid">
+    {{ m.check("apply.email.enabled", "Read verification emails over IMAP", cfg.apply.email.enabled) }}
+    {{ m.field("apply.email.imap_host", "IMAP host", cfg.apply.email.imap_host, "text", "", 253) }}
+    {{ m.number("apply.email.imap_port", "IMAP port", cfg.apply.email.imap_port, 1, 65535) }}
+    {{ m.field("apply.email.username", "Mailbox username", cfg.apply.email.username, "text", "", 200) }}
+    {{ m.field("apply.email.mailbox", "Mailbox folder", cfg.apply.email.mailbox, "text", "", 100) }}
+    {{ m.number("apply.email.timeout_s", "Wait for email (s)", cfg.apply.email.timeout_s, 10, 1800) }}
+  </div>
+  <h3>Language model</h3>
+  <div class="grid">
+    {{ m.field("llm.model", "Model name", cfg.llm.model, "text", "The API key is never set here; run set_openai_key.ps1.", 100) }}
+  </div>
+  {{ m.form_footer("Save settings") }}
+</form>
+{% endblock %}

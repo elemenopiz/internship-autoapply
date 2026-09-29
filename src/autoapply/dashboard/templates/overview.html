@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock %}
+{% block content %}
+<h1>Overview</h1>
+<section class="cards" aria-label="Status">
+  <div class="card stat">
+    <h2>Mode</h2>
+    <p class="big"><span data-bind="mode">{{ state.mode }}</span></p>
+    <label class="inline" for="mode-select">Change mode</label>
+    <select id="mode-select" data-setting="mode">
+      {% for m in modes %}<option value="{{ m }}"{% if m == state.mode %} selected{% endif %}>{{ m }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="card stat">
+    <h2>Today's applications</h2>
+    <p class="big"><span data-bind="submitted_today">{{ state.submitted_today }}</span> / <span data-bind="daily_cap">{{ state.daily_cap }}</span></p>
+    <progress id="cap-bar" max="{{ [state.daily_cap, 1]|max }}" value="{{ state.submitted_today }}" aria-label="Daily cap usage"></progress>
+    <p class="muted"><span data-bind="cap_remaining">{{ state.cap_remaining }}</span> remaining on {{ state.today }} ({{ state.timezone }})</p>
+  </div>
+  <div class="card stat">
+    <h2>Run status</h2>
+    <p class="big" data-bind-running>{{ "Running" if state.running else "Idle" }}</p>
+    <p class="muted">Next scheduled run: <span data-bind="schedule.next_run_at">{{ state.schedule.next_run_at|localdt(tz) or "none" }}</span></p>
+  </div>
+  <div class="card stat">
+    <h2>Needs you</h2>
+    <p class="big"><a href="/answers"><span data-bind="pending_questions">{{ state.pending_questions }}</span> pending question(s)</a></p>
+    <p class="muted">OpenAI key: <span data-bind-key>{% if state.secrets.openai_key.present %}present ({{ state.secrets.openai_key.source }}){% else %}missing{% endif %}</span></p>
+  </div>
+</section>
+
+<section class="card" aria-labelledby="ready-h">
+  <h2 id="ready-h">Readiness</h2>
+  <p id="ready-ok"{% if not state.readiness.ok %} hidden{% endif %} class="ok">Ready: every check passed.</p>
+  <div id="ready-issues"{% if state.readiness.ok %} hidden{% endif %}>
+    <p>Fix these before the applier can run:</p>
+    <ul class="checklist" id="issue-list">
+      {% for issue in state.readiness.issues %}
+      <li data-code="{{ issue.code }}">
+        <strong>{{ issue.field }}</strong>: {{ issue.message }}
+        {% if issue.link %}<a href="{{ issue.link }}">Fix it</a>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="muted">The OpenAI key is never entered here. Run <code>set_openai_key.ps1</code> and restart the dashboard.</p>
+  </div>
+</section>
+
+<section class="card" aria-labelledby="ctl-h">
+  <h2 id="ctl-h">Controls</h2>
+  <div class="buttons">
+    <button type="button" class="btn btn-primary" data-action="run">Run now</button>
+    <button type="button" class="btn" data-action="run" data-mode="dry_run">Dry run</button>
+    <button type="button" class="btn" data-action="run" data-mode="discover_only">Discover only</button>
+    <button type="button" class="btn btn-danger" data-action="stop">Stop</button>
+    <button type="button" class="btn" data-action="unstop">Resume</button>
+  </div>
+  <div class="field field-check">
+    <label><input type="checkbox" id="schedule-toggle" data-setting="schedule.enabled"{% if state.schedule.enabled %} checked{% endif %}> Run automatically on schedule ({{ state.schedule.run_times|join(", ") }})</label>
+    <small class="help">Enabling needs a complete readiness checklist. Edit times and days on the <a href="/settings">Settings</a> page.</small>
+  </div>
+</section>
+
+<section class="card" aria-labelledby="cnt-h">
+  <h2 id="cnt-h">Applications by status</h2>
+  <table class="table">
+    <thead><tr><th>Status</th><th>Count</th></tr></thead>
+    <tbody id="status-counts">
+      {% for status, count in state.applications_by_status.items() %}
+      <tr><td>{{ status|status_label }}</td><td>{{ count }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

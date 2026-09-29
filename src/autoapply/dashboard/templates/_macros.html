@@ -1,0 +1,60 @@
+{% macro field(name, label, value, kind="text", help="", maxlength=200) %}
+<div class="field">
+  <label for="f-{{ name }}">{{ label }}</label>
+  <input id="f-{{ name }}" name="{{ name }}" type="{{ kind }}" value="{{ value if value is not none else '' }}" maxlength="{{ maxlength }}" autocomplete="off">
+  {% if help %}<small class="help">{{ help }}</small>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro tri(name, label, value, help="") %}
+<div class="field">
+  <label for="f-{{ name }}">{{ label }}</label>
+  <select id="f-{{ name }}" name="{{ name }}" data-type="tristate">
+    <option value=""{% if value is none %} selected{% endif %}>Not answered</option>
+    <option value="true"{% if value is sameas true %} selected{% endif %}>Yes</option>
+    <option value="false"{% if value is sameas false %} selected{% endif %}>No</option>
+  </select>
+  {% if help %}<small class="help">{{ help }}</small>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro check(name, label, value, help="") %}
+<div class="field field-check">
+  <label><input type="checkbox" name="{{ name }}"{% if value %} checked{% endif %}> {{ label }}</label>
+  {% if help %}<small class="help">{{ help }}</small>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro lines(name, label, values, help="", rows=4) %}
+<div class="field">
+  <label for="f-{{ name }}">{{ label }}</label>
+  <textarea id="f-{{ name }}" name="{{ name }}" data-type="lines" rows="{{ rows }}">{{ values|join("\n") }}</textarea>
+  {% if help %}<small class="help">{{ help }}</small>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro number(name, label, value, lo, hi, help="", step=1, kind="int") %}
+<div class="field">
+  <label for="f-{{ name }}">{{ label }}</label>
+  <input id="f-{{ name }}" name="{{ name }}" type="number" data-type="{{ kind }}" min="{{ lo }}" max="{{ hi }}" step="{{ step }}" value="{{ value }}">
+  {% if help %}<small class="help">{{ help }}</small>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro badge(status) %}<span class="badge badge-{{ status }}">{{ status|status_label }}</span>{% endmacro %}
+
+{% macro form_footer(label="Save") %}
+<div class="form-footer">
+  <button type="submit" class="btn btn-primary">{{ label }}</button>
+  <span class="form-status" data-status role="status"></span>
+</div>
+<ul class="form-errors" data-errors role="alert"></ul>
+{% endmacro %}
+
+{% macro pager(prev_url, next_url, offset, limit, total) %}
+<nav class="pager" aria-label="Pages">
+  {% if prev_url %}<a href="{{ prev_url }}">Previous</a>{% endif %}
+  <span>{{ offset + 1 if total else 0 }}-{{ [offset + limit, total]|min }} of {{ total }}</span>
+  {% if next_url %}<a href="{{ next_url }}">Next</a>{% endif %}
+</nav>
+{% endmacro %}
