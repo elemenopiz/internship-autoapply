@@ -201,3 +201,11 @@ def test_internship_signals_positive(text: str) -> None:
 )
 def test_internship_signals_negative(text: str | None) -> None:
     assert not signals_internship(text)
+
+
+@pytest.mark.timeout(20)
+@pytest.mark.parametrize("chunk", ["summer/", "summer-", "summer and ", "fall, "])
+def test_adversarial_season_lists_do_not_blow_up(chunk: str) -> None:
+    """Unbounded "summer/summer/..." chains once backtracked quadratically (minutes for 50k repeats)."""
+    assert find_terms(chunk * 50_000) == []
+    find_terms(chunk * 5_000 + " 2027")  # with a year at the end: finishes, result is unspecified

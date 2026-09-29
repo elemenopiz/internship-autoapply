@@ -81,6 +81,11 @@ W_LOCATION = 10.0
 W_KEYWORDS = 10.0
 W_ALLOWLIST = 5.0
 
+# Only the start of very long texts is read, which bounds the work an adversarial posting can cause.
+MAX_TITLE_CHARS = 500
+MAX_DESCRIPTION_CHARS = 60_000
+MAX_LOCATION_CHARS = 500
+
 GENERIC_KEYWORD_FACTOR = 0.9  # a lone generic word ("strategy") is weaker evidence than a phrase
 INTERN_TITLE_PTS = 15.0
 INTERN_METADATA_PTS = 12.0
@@ -171,7 +176,8 @@ def _index_of(tokens: Sequence[str], phrase: Sequence[str]) -> int:
 # --------------------------------------------------------------------------------------------- terms
 
 _SEASON = r"(?:spring|summer|fall|autumn|winter)"
-_SEASON_LIST = rf"{_SEASON}(?:\s*(?:/|,|&|and|or|-)\s*{_SEASON})*"
+# At most four seasons per list: unbounded repetition backtracks quadratically on "summer/summer/...".
+_SEASON_LIST = rf"{_SEASON}(?:\s*(?:/|,|&|and|or|-)\s*{_SEASON}){{0,3}}"
 _TERM_SEASON_FIRST = re.compile(rf"\b({_SEASON_LIST})\s*(?:of\s+)?(?:(20\d\d)|'(\d\d))\b")
 _TERM_YEAR_FIRST = re.compile(rf"\b(20\d\d)\s+({_SEASON_LIST})\b")
 _SEASON_WORD = re.compile(_SEASON)
@@ -498,7 +504,7 @@ def _relocation_penalty(profile: Profile | None) -> float:
 
 def _location_fit(location: str | None, search: SearchProfile, profile: Profile | None) -> _Fit:
     """Location component: preferred list, remote acceptance and the ``us_only`` guard."""
-    raw = (location or "").strip()
+    raw = (location or "").strip()[:MAX_LOCATION_CHARS]
     if not raw:
         return _Fit(
             LOC_UNKNOWN_PTS, (f"No location listed; treated as neutral (+{LOC_UNKNOWN_PTS:g}).",)
@@ -998,8 +1004,8 @@ class _Facts:
 
 
 def _facts(op: Opportunity, search: SearchProfile, comp: _Compiled) -> _Facts:
-    title_tokens = tokenize(op.title)
-    desc_clean = _clean(op.description) if op.description else ""
+    title_tokens = tokenize(op.title[:MAX_TITLE_CHARS])
+    desc_clean = _clean(op.description[:MAX_DESCRIPTION_CHARS]) if op.description else ""
     return _Facts(
         title_tokens=title_tokens,
         desc_clean=desc_clean,

@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 import autoapply
-from autoapply.models import Opportunity, Profile, ScoreResult, SearchProfile
+from autoapply.models import Opportunity, Profile, RoleFamily, ScoreResult, SearchProfile
 from autoapply.scoring import score_all, score_opportunity
 
 SEARCH = SearchProfile(
@@ -379,3 +379,69 @@ def test_fuzzed_opportunities_keep_the_invariants() -> None:
         assert all(isinstance(x, str) and x for x in [*result.reasons, *result.penalties])
         assert result.role_family is None or result.role_family in SEARCH.role_families
         assert _dump(result) == _dump(score_opportunity(op, SEARCH)), title
+
+
+def test_fuzzed_search_profiles_never_crash_and_keep_the_invariants() -> None:
+    rng = random.Random(424242)
+    pool = [
+        "product manager",
+        "APM",
+        "strategy & operations",
+        "data analyst",
+        "C++",
+        "R&D",
+        "co-op",
+        "M.B.A.",
+        "Ph.D.",
+        "  ",
+        "",
+        "économie",
+        "北京",
+        "senior",
+        "sr.",
+        "intern",
+        "Summer 2027",
+        "quant",
+        "x" * 200,
+        "o'brien",
+        "a/b",
+        "(parens)",
+        "50%",
+        "#hashtag",
+    ]
+    places = ["Austin, TX", "TX", "Remote", "", "  ", "Toronto, ON", "United States", "NYC", "北京"]
+    terms = ["Summer 2027", "Fall '28", "2027", "n/a", "", "Summer", "Winter 2030"]
+    for _ in range(150):
+        families = {
+            f"fam{i}": RoleFamily(
+                keywords=[rng.choice(pool) for _ in range(rng.randint(0, 4))],
+                weight=rng.choice([0.0, 0.3, 0.7, 1.0, 1.0, 5.0, -1.0]),
+            )
+            for i in range(rng.randint(0, 4))
+        }
+        search = SearchProfile(
+            target_term=rng.choice(terms),
+            role_families=families,
+            include_keywords=[rng.choice(pool) for _ in range(rng.randint(0, 3))],
+            exclude_title_keywords=[rng.choice(pool) for _ in range(rng.randint(0, 3))],
+            preferred_locations=[rng.choice(places) for _ in range(rng.randint(0, 3))],
+            company_allowlist=[rng.choice(pool) for _ in range(rng.randint(0, 2))],
+            company_denylist=[rng.choice(pool) for _ in range(rng.randint(0, 2))],
+            us_only=rng.random() > 0.5,
+            remote_ok=rng.random() > 0.5,
+            min_score=rng.choice([0.0, 30.0, 55.0, 100.0]),
+        )
+        op = Opportunity(
+            company=rng.choice(pool) or "Acme",
+            title=" ".join(rng.choice(pool) for _ in range(rng.randint(1, 4))),
+            location=rng.choice(places) or None,
+            term=rng.choice([None, "Summer 2027", "Fall 2026", ""]),
+            description=rng.choice([None, "", " ".join(rng.choice(pool) for _ in range(30))]),
+        )
+        result = score_opportunity(
+            op, search, Profile(degree=rng.choice(["", "MBA", "PhD", "B.S."]))
+        )
+        assert 0.0 <= result.score <= 100.0
+        hard = any(p.startswith("Hard fail:") for p in result.penalties)
+        assert (not hard) or (result.score == 0.0 and not result.passed)
+        assert result.passed == ((not hard) and result.score >= search.min_score)
