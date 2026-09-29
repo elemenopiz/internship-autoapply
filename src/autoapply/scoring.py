@@ -263,7 +263,7 @@ def signals_internship(text: str | None) -> bool:
     return _tokens_signal_internship(tokenize(text))
 
 
-_METADATA_KEYS = ("employment_type", "commitment", "job_type", "type", "department")
+_METADATA_KEYS = ("employment_type", "commitment", "job_type", "type", "department", "team")
 
 
 def _metadata_signals_internship(extra: Mapping[str, Any]) -> bool:
