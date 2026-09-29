@@ -55,3 +55,9 @@ A1 - A2 - A3 - A4 - A5 - A6 - A7 - A8 - A9 - A10 - A11 - A12 - A13 - A14 - A15 -
 
 ## Open items / decisions
 - Live-site behaviour cannot be verified from the sandbox; `doctor --live-dry-run` is the user's validation tool.
+
+## Backlog for the fix loop (found in review of merged work)
+- scheduler: enabling the schedule must NOT trigger an immediate catch-up run (initialise last_slot=now when unset).
+- accounts: adapters must pass the RAW hostname (urlsplit(url).hostname), not normalize.host_of, to AccountManager.
+- accounts: treat failed sign-in on an unverified never-logged-in account as "register" (crash between password gen and signup).
+- pipeline: runner's own LLM use is outside BudgetedLLM; a hung runner is only stopped by the engine's cooperative deadline.
