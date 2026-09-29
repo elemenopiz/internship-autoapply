@@ -545,10 +545,7 @@ def test_http_shell_redirects_and_closed_jobs() -> None:
         assert resp.headers["location"] == "/en-US/External/job/Austin-TX/Open-Role_R1"
         ok = http.get("/en-US/External/job/Austin-TX/Open-Role_R1")
         assert ok.status_code == 200 and "wd-bootstrap" in ok.text
-        assert (
-            "PLAY_SESSION" in ok.headers["set-cookie"]
-            and "HttpOnly" in ok.headers["set-cookie"]
-        )
+        assert "PLAY_SESSION" in ok.headers["set-cookie"] and "HttpOnly" in ok.headers["set-cookie"]
         gone = http.get("/en-US/External/job/Austin-TX/Old-Role_R9")
         assert gone.status_code == 404
         assert "The page you are looking for doesn't exist." in gone.text
@@ -743,6 +740,8 @@ def test_sign_in_button_is_covered_by_the_click_filter_overlay(start: StartFn) -
     )
     with pytest.raises(PlaywrightError, match="strict mode violation"):
         d.page.get_by_role("button", name="Sign In").click(timeout=1500)
+    button.dispatch_event("click")  # a synthetic click on the covered button does nothing either
+    d.page.wait_for_timeout(300)
     assert "sign_in_ok" not in " ".join(env.site.events)
     overlay.click()
     d.wait_page("applyFlowMyInfoPage")
@@ -1170,6 +1169,9 @@ def test_dropdown_keyboard_interaction_and_outside_click(start: StartFn) -> None
     assert region.inner_text() == "Alabama"
     d.aid("phone-device-type").click()
     assert d.page.get_by_role("option").count() == 3
+    d.aid("legalNameSection_middleName").fill("x")  # moving the focus elsewhere closes it as well
+    assert d.page.get_by_role("option").count() == 0
+    d.aid("phone-device-type").click()
     d.aid(
         "legalNameSection_lastName"
     ).click()  # clicking elsewhere closes the popup without choosing
