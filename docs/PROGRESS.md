@@ -18,19 +18,28 @@ Sandbox facts: ATS hosts + api.openai.com are blocked (403) -> everything is ver
 ## Wave 1 workers (branches)
 | id | task | branch / worktree | status |
 |---|---|---|---|
-| A | db.py | worktree-agent-aad13fe4da705016e | running |
-| B | secrets/llm/readiness | worktree-agent-a3c3d4d01b46f7f2b | running |
+| A | db.py | worktree-agent-aad13fe4da705016e | MERGED (861 tests green) |
+| B | secrets/llm/readiness | worktree-agent-a3c3d4d01b46f7f2b | MERGED |
 | C | workbook + dedupe + fixtures | w1/workbook | running |
 | D | boards + scoring | w1/boards-scoring | running |
 | E | tailor + sample_profile | w1/tailor | running |
 | F | mock greenhouse/lever/ashby/blockers | w1/mocks-a | running |
 | G | mock workday/employer portal | w1/mocks-b | running |
 
+## Wave 2 workers launched early (deps already merged / injected)
+| task | branch / worktree | status |
+|---|---|---|
+| accounts + emailverify | w2/accounts | running |
+| dashboard | w2/dashboard | running |
+| pipeline + scheduler | w2/pipeline | running |
+| apply framework (browser/blockers/registry/engine/helpers) | w2/framework | waits for mocks F+G merged |
+| answers engine | w2/answers | waits for tailor (E) merged |
+
 ## Wave log
 | wave | scope | status |
 |---|---|---|
 | 0 | spec, contracts, scaffold, mock-ATS base | done |
-| 1 | db, platform services, workbook, boards, scoring, tailoring, mock sites (x2) | pending |
+| 1 | db, platform services, workbook, boards, scoring, tailoring, mock sites (x2) | A,B merged; C,D,E,F,G running |
 | 2 | apply engine, adapters, answers, accounts, generic filler | pending |
 | 3 | pipeline, scheduler, dashboard, CLI/PowerShell, LinkedIn/Indeed | pending |
 | 4 | acceptance suite + fix loop | pending |
