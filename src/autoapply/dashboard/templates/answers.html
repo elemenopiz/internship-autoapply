@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Screening answers{% endblock %}
+{% block content %}
+<h1>Screening answers</h1>
+
+<section class="card" aria-labelledby="pq-h">
+  <h2 id="pq-h">Pending questions</h2>
+  <p class="muted">Required questions the applier could not answer. It never guesses factual or legal answers: answer once here and it is reused everywhere.</p>
+  {% if not pending %}<p class="ok">Nothing waiting for you.</p>{% endif %}
+  <ul class="pending" id="pending-list">
+    {% for q in pending %}
+    <li class="pending-item" data-question-id="{{ q.id }}">
+      <p><strong>{{ q.question }}</strong></p>
+      <p class="muted">{% if q.company %}{{ q.company }} - {% endif %}{{ q.kind|status_label }}</p>
+      {% if q.options %}
+      <select aria-label="Answer" data-answer-input>
+        {% for o in q.options %}<option value="{{ o }}">{{ o }}</option>{% endfor %}
+      </select>
+      {% else %}
+      <input type="text" aria-label="Answer" data-answer-input maxlength="2000">
+      {% endif %}
+      <button type="button" class="btn btn-primary" data-action="resolve-question">Save answer</button>
+      <span class="form-status" data-status role="status"></span>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="card" aria-labelledby="sa-h">
+  <h2 id="sa-h">Saved answers</h2>
+  <div class="table-wrap">
+  <table class="table" id="answers-table">
+    <thead><tr><th>Intent</th><th>Question</th><th>Answer</th><th>Kind</th><th>Used</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for a in answers %}
+      <tr data-answer-id="{{ a.id }}">
+        <td>{{ a.intent or "" }}</td>
+        <td><span class="view">{{ a.question }}</span><input class="edit" hidden data-field="question" value="{{ a.question }}" maxlength="500" aria-label="Question"></td>
+        <td><span class="view">{{ a.answer }}</span><textarea class="edit" hidden data-field="answer" maxlength="2000" rows="2" aria-label="Answer">{{ a.answer }}</textarea></td>
+        <td>{{ a.answer_kind }}</td>
+        <td>{{ a.use_count }}</td>
+        <td>
+          <button type="button" class="btn view" data-action="edit-answer">Edit</button>
+          <button type="button" class="btn btn-primary edit" hidden data-action="save-answer">Save</button>
+          <button type="button" class="btn edit" hidden data-action="cancel-edit">Cancel</button>
+          <button type="button" class="btn btn-danger" data-action="delete-answer">Delete</button>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">No saved answers yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<form class="card" data-api="/api/answers" data-method="POST" data-reload novalidate>
+  <h2>Add an answer</h2>
+  <div class="grid">
+    {{ m.field("question", "Question wording", "", "text", "How the question is usually worded.", 500) }}
+    <div class="field">
+      <label for="f-intent">Intent (optional)</label>
+      <input id="f-intent" name="intent" list="intent-list" maxlength="64" autocomplete="off">
+      <datalist id="intent-list">{% for i in intents %}<option value="{{ i }}">{% endfor %}</datalist>
+      <small class="help">A stable key such as felony_conviction; matches every wording of that question.</small>
+    </div>
+    <div class="field">
+      <label for="f-answer">Answer</label>
+      <textarea id="f-answer" name="answer" rows="2" maxlength="2000"></textarea>
+    </div>
+    <div class="field">
+      <label for="f-kind">Kind</label>
+      <select id="f-kind" name="answer_kind"><option>text</option><option>boolean</option><option>choice</option><option>number</option></select>
+    </div>
+  </div>
+  {{ m.form_footer("Save answer") }}
+</form>
+{% endblock %}

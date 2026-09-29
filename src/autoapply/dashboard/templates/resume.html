@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Resume &amp; experiences{% endblock %}
+{% block content %}
+<h1>Resume &amp; experiences</h1>
+
+<section class="card" aria-labelledby="res-h">
+  <h2 id="res-h">Your resume (PDF)</h2>
+  <p id="resume-status">
+    {% if resume.present %}
+      Present: <strong>{{ resume.filename }}</strong>, {{ resume.size }} bytes, saved {{ resume.modified|localdt(tz) }}.
+    {% else %}
+      <span class="warn">No resume uploaded yet.</span>
+    {% endif %}
+  </p>
+  <form data-upload="/api/resume/upload" novalidate>
+    <div class="field">
+      <label for="resume-file">Choose a PDF (max 10 MB)</label>
+      <input id="resume-file" type="file" name="file" accept="application/pdf,.pdf">
+    </div>
+    <div class="form-footer">
+      <button type="submit" class="btn btn-primary">Upload resume</button>
+      <span class="form-status" data-status role="status"></span>
+    </div>
+    <ul class="form-errors" data-errors role="alert"></ul>
+  </form>
+  <p class="muted">Without a knowledge base below, the applier attaches this PDF unchanged.</p>
+</section>
+
+<section class="card" aria-labelledby="kb-h">
+  <h2 id="kb-h">Experiences (knowledge base)</h2>
+  <p class="muted">The only source tailored resumes and cover letters may draw from. Nothing here is ever invented: the tailoring step reuses these employers, titles, dates and bullets.</p>
+  {% if kb_error %}<p class="warn">{{ kb_error }}</p>{% endif %}
+  {% for w in meta.warnings %}<p class="warn">{{ w }}</p>{% endfor %}
+  <div class="buttons">
+    <button type="button" class="btn" data-action="build-kb">Build from my resume (AI)</button>
+    <button type="button" class="btn" data-action="add-experience">Add experience</button>
+  </div>
+  <p class="form-status" id="kb-note" role="status"></p>
+  <form id="kb-form" data-kb-form="/api/kb" data-kb="{{ kb_json }}" novalidate>
+    <div class="field">
+      <label for="kb-skills">Skills (comma separated)</label>
+      <input id="kb-skills" type="text" data-kb-skills>
+    </div>
+    <div id="kb-experiences"></div>
+    <div class="form-footer">
+      <button type="submit" class="btn btn-primary">Save knowledge base</button>
+      <span class="form-status" data-status role="status"></span>
+    </div>
+    <ul class="form-errors" data-errors role="alert"></ul>
+  </form>
+  <template id="exp-template">
+    <fieldset class="experience">
+      <legend>Experience</legend>
+      <div class="grid">
+        <div class="field"><label>Id</label><input data-k="id" maxlength="64"></div>
+        <div class="field"><label>Kind</label>
+          <select data-k="kind">
+            <option>work</option><option>project</option><option>education</option>
+            <option>leadership</option><option>award</option><option>skill</option><option>other</option>
+          </select></div>
+        <div class="field"><label>Title</label><input data-k="title" maxlength="200"></div>
+        <div class="field"><label>Organization</label><input data-k="organization" maxlength="200"></div>
+        <div class="field"><label>Location</label><input data-k="location" maxlength="200"></div>
+        <div class="field"><label>Start (YYYY-MM)</label><input data-k="start" maxlength="7"></div>
+        <div class="field"><label>End (YYYY-MM or present)</label><input data-k="end" maxlength="7"></div>
+        <div class="field"><label>Skills (comma separated)</label><input data-k="skills"></div>
+      </div>
+      <div class="field"><label>Bullets (one per line)</label><textarea data-k="bullets" rows="4"></textarea></div>
+      <div class="field"><label>Links (one per line)</label><textarea data-k="links" rows="2"></textarea></div>
+      <button type="button" class="btn btn-danger" data-action="remove-experience">Remove</button>
+    </fieldset>
+  </template>
+</section>
+{% endblock %}

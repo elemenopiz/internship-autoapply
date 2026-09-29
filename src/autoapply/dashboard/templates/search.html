@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m %}
+{% block title %}Search{% endblock %}
+{% block content %}
+<h1>Search</h1>
+
+<form class="card" data-api="/api/search" data-method="PUT" data-search-form novalidate>
+  <h2>Search profile</h2>
+  <div class="grid">
+    {{ m.field("target_term", "Target term", search.target_term, "text", "For example Summer 2027.", 100) }}
+    {{ m.number("recent_days", "Only postings verified within (days)", search.recent_days, 1, 365) }}
+    {{ m.number("min_score", "Minimum score to apply (0-100)", search.min_score, 0, 100, "Below this an opportunity is never applied to.", 1, "float") }}
+    {{ m.check("us_only", "US locations only", search.us_only) }}
+    {{ m.check("remote_ok", "Remote is fine", search.remote_ok) }}
+  </div>
+  <div class="grid">
+    {{ m.lines("include_keywords", "Bonus keywords", search.include_keywords, "One per line; extra points when present.") }}
+    {{ m.lines("exclude_title_keywords", "Excluded title words", search.exclude_title_keywords, "One per line; a match rejects the role.") }}
+    {{ m.lines("preferred_locations", "Preferred locations", search.preferred_locations, "One per line; empty means anywhere.") }}
+    {{ m.lines("company_allowlist", "Companies to favour", search.company_allowlist) }}
+    {{ m.lines("company_denylist", "Companies to never apply to", search.company_denylist) }}
+  </div>
+  <h3>Role families</h3>
+  <div id="families">
+    {% for name, family in search.role_families.items() %}
+    <fieldset class="family" data-family>
+      <legend>Family</legend>
+      <div class="grid">
+        <div class="field"><label>Name</label><input data-k="name" value="{{ name }}" maxlength="60"></div>
+        <div class="field"><label>Weight (0-1)</label><input data-k="weight" type="number" min="0" max="1" step="0.05" value="{{ family.weight }}"></div>
+      </div>
+      <div class="field"><label>Keywords (one per line)</label><textarea data-k="keywords" rows="4">{{ family.keywords|join("\n") }}</textarea></div>
+      <button type="button" class="btn btn-danger" data-action="remove-family">Remove family</button>
+    </fieldset>
+    {% endfor %}
+  </div>
+  <div class="buttons"><button type="button" class="btn" data-action="add-family">Add role family</button></div>
+  {{ m.form_footer("Save search profile") }}
+</form>
+
+<form class="card" data-api="/api/settings" data-method="PUT" novalidate>
+  <h2>Sources</h2>
+  <fieldset>
+    <legend>Platforms</legend>
+    {% for name, on in platforms.items() %}
+      {{ m.check("platforms." ~ name, name|title ~ (" (discovery only, opt-in)" if name in ("linkedin", "indeed") else ""), on) }}
+    {% endfor %}
+    <p class="muted">LinkedIn and Indeed restrict automation. Turning them on means you accept that risk; nothing is ever applied on those sites.</p>
+  </fieldset>
+  <fieldset>
+    <legend>Company board tokens</legend>
+    <div class="grid">
+      {{ m.lines("boards.greenhouse", "Greenhouse", boards.greenhouse, "One token per line, e.g. stripe") }}
+      {{ m.lines("boards.lever", "Lever", boards.lever) }}
+      {{ m.lines("boards.ashby", "Ashby", boards.ashby) }}
+    </div>
+  </fieldset>
+  <fieldset>
+    <legend>Workbook</legend>
+    <div class="grid">
+      {{ m.field("workbook.path", "Workbook path (.xlsx)", workbook.path, "text", "The verified-opportunities workbook.", 500) }}
+      {{ m.field("workbook.sheet", "Sheet name (optional)", workbook.sheet, "text", "Default: best match for verified opportunities.", 100) }}
+    </div>
+    <button type="button" class="btn" data-action="inspect-workbook">Inspect workbook</button>
+    <div id="inspect-result" class="inspect" aria-live="polite"></div>
+  </fieldset>
+  {{ m.form_footer("Save sources") }}
+</form>
+{% endblock %}

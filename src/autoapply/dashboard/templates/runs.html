@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Runs{% endblock %}
+{% block content %}
+<h1>Runs</h1>
+<div class="table-wrap">
+<table class="table" id="runs-table">
+  <thead><tr><th>#</th><th>Started</th><th>Finished</th><th>Mode</th><th>Trigger</th><th>Found</th><th>New</th><th>Eligible</th><th>Tried</th><th>Submitted</th><th>Dry OK</th><th>Manual</th><th>Failed</th><th>Skipped</th><th>Stopped because</th></tr></thead>
+  <tbody>
+  {% for r in runs %}
+    <tr>
+      <td>{{ r.run_id }}</td><td>{{ r.started_at|localdt(tz) }}</td><td>{{ r.finished_at|localdt(tz) or "running" }}</td>
+      <td>{{ r.mode|status_label }}</td><td>{{ r.trigger }}</td>
+      <td>{{ r.discovered }}</td><td>{{ r.new }}</td><td>{{ r.eligible }}</td><td>{{ r.attempted }}</td>
+      <td>{{ r.submitted }}</td><td>{{ r.dry_run_ok }}</td><td>{{ r.needs_manual }}</td><td>{{ r.failed }}</td><td>{{ r.skipped }}</td>
+      <td>{{ (r.stopped_reason or "")|status_label }}{% for e in r.errors %}<br><span class="muted">{{ e }}</span>{% endfor %}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="15" class="muted">No runs yet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}
