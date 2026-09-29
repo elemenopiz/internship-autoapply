@@ -39,7 +39,7 @@ validate adapters against real sites (fills forms, never submits) on their own m
    or the credential store. Other secrets (ATS passwords, IMAP app password) live only in the OS credential store
    (`keyring` -> Windows Credential Manager). Passwords/keys never appear in logs, traces, API responses, artifacts.
 8. **Tests can never submit a real application:** tests/e2e use only mock sites on `*.localhost`; the test browser is
-   launched loopback-restricted (`--host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE 127.0.0.1"`);
+   launched loopback-restricted (`--host-resolver-rules="MAP * ~NOTFOUND, EXCLUDE localhost, EXCLUDE *.localhost, EXCLUDE 127.0.0.1"`);
    `FakeLLM` only when `AUTOAPPLY_TESTING=1` or injected in code.
 9. **The LLM is an enhancer, not a dependency of correctness:** every call site catches `LLMError` and falls back to a
    deterministic path or a defined failure outcome. A run never crashes on the LLM.
