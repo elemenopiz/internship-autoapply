@@ -773,7 +773,7 @@ def test_blank_ragged_and_separator_rows(tmp_path: Path) -> None:
             good_row(1),
             [],
             [None, None, None],
-            ["   ", " ", None],
+            ["   ", "\u00a0", None],
             ["N/A", "-", "TBD"],
             ["Section heading"],
             ["Acme", "Short Intern", "https://acme.example/short"],  # ragged: 3 of 7 cells
@@ -914,7 +914,7 @@ def test_long_cells_are_truncated_not_fatal(tmp_path: Path) -> None:
     ]
     result = parse(make(tmp_path, rows, header=header))
     (opp,) = result.opportunities
-    assert len(opp.title) == 300 and opp.title.endswith("…")
+    assert len(opp.title) == 300 and opp.title.endswith("\u2026")
     assert opp.description is not None and len(opp.description) == 20_000
     assert len(opp.extra["notes"]) == 1000
     assert len(opp.extra["Pay"]) == 1000
@@ -924,13 +924,16 @@ def test_long_cells_are_truncated_not_fatal(tmp_path: Path) -> None:
 def test_unicode_and_odd_whitespace_survive(tmp_path: Path) -> None:
     rows = [
         good_row(
-            1, Company="  Café ​Müller GmbH ", Role="Analyst–Intern\n(M/F/D)", Location="München"
+            1,
+            Company="  Caf\u00e9 \u200bM\u00fcller\u00a0GmbH ",
+            Role="Analyst\u2013Intern\n(M/F/D)",
+            Location="M\u00fcnchen",
         )
     ]
     (opp,) = parse(make(tmp_path, rows)).opportunities
-    assert opp.company == "Café Müller GmbH"
-    assert opp.title == "Analyst–Intern (M/F/D)"
-    assert opp.location == "München"
+    assert opp.company == "Caf\u00e9 M\u00fcller GmbH"
+    assert opp.title == "Analyst\u2013Intern (M/F/D)"
+    assert opp.location == "M\u00fcnchen"
 
 
 def test_numbers_in_text_columns(tmp_path: Path) -> None:
@@ -1126,14 +1129,25 @@ def test_empty_file(tmp_path: Path) -> None:
         parse(path)
 
 
-@pytest.mark.parametrize(
-    "payload", [b"this is not a zip file", b"PK\x03\x04garbage", b"\xd0\xcf\x11\xe0" + b"\x00" * 64]
-)
+@pytest.mark.parametrize("payload", [b"this is not a zip file", b"PK\x03\x04garbage"])
 def test_corrupt_files(tmp_path: Path, payload: bytes) -> None:
     path = tmp_path / "corrupt.xlsx"
     path.write_bytes(payload)
     with pytest.raises(WorkbookError, match="not a readable .xlsx"):
         parse(path)
+
+
+def test_encrypted_or_legacy_containers_get_a_specific_message(tmp_path: Path) -> None:
+    path = tmp_path / "protected.xlsx"
+    path.write_bytes(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 64)
+    with pytest.raises(WorkbookError, match="password-protected"):
+        parse(path)
+
+
+def test_streaming_mode_warns_that_links_and_merges_are_unavailable(tmp_path: Path) -> None:
+    result = parse(make(tmp_path, [good_row(1)]), streaming=True)
+    assert any("streaming mode" in w for w in result.warnings)
+    assert parse(make(tmp_path, [good_row(1)], name="again.xlsx")).warnings == []
 
 
 def test_excel_lock_files_and_csv_are_not_workbooks(tmp_path: Path) -> None:
@@ -1160,9 +1174,9 @@ def test_workbook_without_rows_below_the_header(tmp_path: Path) -> None:
 
 
 def test_windows_hostile_paths(tmp_path: Path) -> None:
-    folder = tmp_path / "My Résumé & Jobs (2027) — final"
+    folder = tmp_path / "My R\u00e9sum\u00e9 & Jobs (2027) \u2014 final"
     folder.mkdir()
-    path = make(folder, [good_row(1)], name="Verified opps — Summer '27 (v2).xlsx")
+    path = make(folder, [good_row(1)], name="Verified opps \u2014 Summer '27 (v2).xlsx")
     assert titles(parse(path)) == ["Product Intern 1"]
 
 

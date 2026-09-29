@@ -22,8 +22,8 @@ SUMMER_27 = Term("summer", 2027)
         "summer 2027",
         "SUMMER 2027",
         "Summer '27",
-        "Summer ’27",  # typographic apostrophe
-        "Summer’27",
+        "Summer \u201927",  # typographic apostrophe
+        "Summer\u201927",
         "Summer'27",
         "Sum 2027",
         "Sum. 2027",
@@ -43,6 +43,12 @@ SUMMER_27 = Term("summer", 2027)
         "Sum27",
         "Product Intern (Summer 2027)",
         "Product Intern - Summer 2027 (Austin)",
+        "Summer (2027)",
+        "Summer [2027]",
+        "Summer ('27)",
+        "Summer '27 (May-Aug)",
+        "Summer 2027 - applications close Oct 1",
+        "Summer 2027 / Class of 2028",
     ],
 )
 def test_summer_2027_in_many_spellings(text: str) -> None:
@@ -97,6 +103,11 @@ def test_strict_mode_ignores_application_windows() -> None:
     assert parse_terms("Applications are open. Summer 2027", strict=True) == [SUMMER_27]
     # the loose parser (a Term cell) does not care
     assert parse_terms("Applications open Fall 2026") == [Term("fall", 2026)]
+
+
+def test_a_bracket_only_links_when_it_directly_follows_the_season() -> None:
+    assert parse_terms("Summer (2027)") == [SUMMER_27]
+    assert parse_terms("Summer Intern (Fall 2027 start)", strict=True) == [Term("fall", 2027)]
 
 
 def test_seasons_far_from_the_year_are_not_paired() -> None:

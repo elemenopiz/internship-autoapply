@@ -346,7 +346,9 @@ def test_very_long_error_messages_are_capped(tmp_path: Path) -> None:
     result = ingest_all(
         ctx_for(tmp_path), providers=[Fake("x", fetch_error=RuntimeError("y" * 5000))]
     )
-    assert len(result.provider_errors["x"]) <= 500 and result.provider_errors["x"].endswith("…")
+    assert len(result.provider_errors["x"]) <= 500 and result.provider_errors["x"].endswith(
+        "\u2026"
+    )
 
 
 def test_providers_offering_a_report_are_asked_for_it(tmp_path: Path) -> None:
@@ -388,7 +390,7 @@ def test_discovery_is_used_when_no_providers_are_given(
 
 @pytest.fixture
 def sample(tmp_path: Path):  # type: ignore[no-untyped-def]
-    info = build_sample_workbook(tmp_path / "Verified Opportunities — sample.xlsx")
+    info = build_sample_workbook(tmp_path / "Verified Opportunities \u2014 sample.xlsx")
     ctx = ctx_for(tmp_path, only_workbook_config(info.path))
     return info, ctx
 

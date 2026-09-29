@@ -69,7 +69,12 @@ class WorkbookError(ValueError):
 
 
 class RejectReason(StrEnum):
-    """Why a row was not turned into an opportunity (one primary reason per rejected row)."""
+    """Why a row was not turned into an opportunity (one primary reason per rejected row).
+
+    A row that fails several filters is reported under the first of: missing_fields, closed /
+    already_applied, deadline_passed, wrong_term, not_internship, stale, no_url (``Rejection.also`` lists
+    the rest).
+    """
 
     MISSING_FIELDS = "missing_fields"  # has cells, but no company or no title
     CLOSED = (
@@ -215,12 +220,12 @@ def parse_ats_hint(text: str | None) -> ATS | None:
 # ------------------------------------------------------------------------------------------------ text helpers
 
 _PLACEHOLDERS = frozenset(
-    _words("n/a na n.a. none null nil nan - -- --- — – tbd tba ? ?? unknown")
+    _words("n/a na n.a. none null nil nan - -- --- \u2014 \u2013 tbd tba ? ?? unknown")
     + ("not applicable", "not available")
 )
 _EXCEL_ERROR = re.compile(r"^#(?:N/A|REF!|VALUE!|NAME\?|DIV/0!|NULL!|NUM!|SPILL!|CALC!)$", re.I)
-_INVISIBLE = dict.fromkeys(map(ord, "​‌‍⁠﻿­"), None)
-_HSPACE = re.compile(r"[ \t\f\v    　]+")
+_INVISIBLE = dict.fromkeys(map(ord, "\u200b\u200c\u200d\u2060\ufeff\u00ad"), None)
+_HSPACE = re.compile(r"[ \t\f\v\u00a0\u2007\u2009\u202f\u3000]+")
 
 
 def clean_text(value: object, *, multiline: bool = False, limit: int | None = None) -> str:
@@ -248,18 +253,18 @@ def clean_text(value: object, *, multiline: bool = False, limit: int | None = No
     if not text or text.lower() in _PLACEHOLDERS or _EXCEL_ERROR.match(text):
         return ""
     if limit is not None and len(text) > limit:
-        text = text[: limit - 1].rstrip() + "…"
+        text = text[: limit - 1].rstrip() + "\u2026"
     return text
 
 
-_URL_IN_TEXT = re.compile(r"(?i)(?:https?://|www\.)[^\s<>\"'“”]+")
+_URL_IN_TEXT = re.compile(r"(?i)(?:https?://|www\.)[^\s<>\"'\u201c\u201d]+")
 _BARE_URL = re.compile(
     r"(?i)^[a-z0-9][a-z0-9-]*(?:\.[a-z0-9-]+)*\.[a-z]{2,}(?::\d+)?(?:[/?#]\S*)?$"
 )
 
 
 def _strip_url_tail(url: str) -> str:
-    url = url.rstrip(".,;:!?'\"”’")
+    url = url.rstrip(".,;:!?'\"\u201d\u2019")
     while url.endswith(")") and url.count("(") < url.count(")"):
         url = url[:-1].rstrip(".,;:!?")
     return url
@@ -547,12 +552,13 @@ _SEASON_TOKEN = re.compile(
     r"(?<![A-Za-z])(summer|summr|sum|fall|autumn|spring|winter)(?![A-Za-z])\.?", re.I
 )
 _YEAR_TOKEN = re.compile(
-    r"(?<![\d$#.])(?:(?P<y4>20\d\d)(?!\d)|['’‘`]\s?(?P<y2a>\d\d)(?!\d)|(?P<y2b>\d\d)(?![\d%]))"
+    r"(?<![\d$#.])(?:(?P<y4>20\d\d)(?!\d)|['\u2019\u2018`]\s?(?P<y2a>\d\d)(?!\d)|(?P<y2b>\d\d)(?![\d%]))"
 )
 _UNIT_AFTER = re.compile(r"^\s*-?\s*(?:weeks?|wks?|months?|mos?\b|hours?|hrs?|days?)", re.I)
-_SEASON_JOIN = re.compile(r"^\s*(?:/|&|,|-|–|—|\+|and|or)\s*$", re.I)
-_GAP_AFTER = re.compile(r"^[\s,.\-–—/']*(?:[A-Za-z]+[\s,.\-–—]*){0,3}$")
-_GAP_ADJACENT = re.compile(r"^[\s,.\-–—/']*$")
+_SEASON_JOIN = re.compile(r"^\s*(?:/|&|,|-|\u2013|\u2014|\+|and|or)\s*$", re.I)
+_GAP_AFTER = re.compile(r"^[\s,.\-\u2013\u2014/']*(?:[A-Za-z]+[\s,.\-\u2013\u2014]*){0,3}$")
+_GAP_BRACKET = re.compile(r"^\s*[(\[]\s*$")  # "Summer (2027)"
+_GAP_ADJACENT = re.compile(r"^[\s,.\-\u2013\u2014/']*$")
 # "Applications open Fall 2026" / "deadline Sep 2026": a term named as an application window, not the cohort.
 _WINDOW_CUE = re.compile(
     r"\b(?:appl(?:y|ies|ication|ications|ying)|deadline|due|opens?|opening|closes?|closing|posted|updated|"
@@ -599,7 +605,9 @@ def _year_fits(text: str, token: _YearToken, gap: str, adjacent_only: bool) -> b
             and not _UNIT_AFTER.match(text[token.end : token.end + 12])
             and bool(_GAP_ADJACENT.match(gap))
         )
-    return bool((_GAP_ADJACENT if adjacent_only else _GAP_AFTER).match(gap))
+    if adjacent_only:
+        return bool(_GAP_ADJACENT.match(gap))
+    return bool(_GAP_AFTER.match(gap) or _GAP_BRACKET.match(gap))
 
 
 def _scan_terms(text: str) -> list[tuple[Term, int]]:
@@ -743,8 +751,8 @@ def decide_term(target_term: str, term_cell: str, title: str, notes: str) -> Ter
 
 StatusKind = Literal["open", "closed", "applied", "unknown"]
 
-_YES_SYMBOLS = frozenset("✓✔✅☑\U0001f7e2")
-_NO_SYMBOLS = frozenset("✗✘✕❌☒✖\U0001f534")
+_YES_SYMBOLS = frozenset("\u2713\u2714\u2705\u2611\U0001f7e2")
+_NO_SYMBOLS = frozenset("\u2717\u2718\u2715\u274c\u2612\u2716\U0001f534")
 _YES_WORDS = frozenset(_words("yes y true 1 yep yeah"))
 _NO_WORDS = frozenset(_words("no n false 0 nope"))
 _NOT_CLOSED = re.compile(
@@ -1443,6 +1451,11 @@ def _open_book(path: Path, *, streaming: bool | None = None) -> _Book:
         raise WorkbookError(f"cannot read {path}: {exc}") from exc
     if not data:
         raise WorkbookError(f"{path.name} is empty")
+    if data[:4] == b"\xd0\xcf\x11\xe0":  # OLE2 container: legacy .xls, or an encrypted .xlsx
+        raise WorkbookError(
+            f"{path.name} is an old .xls file or a password-protected workbook; "
+            "save an unprotected copy as .xlsx"
+        )
     stream = len(data) > LARGE_FILE_BYTES if streaming is None else streaming
     try:
         return _Book(data, streaming=stream)
@@ -1965,7 +1978,12 @@ def read_workbook(
     book = _open_book(path, streaming=streaming)
     try:
         selection = _select_sheet(book, config.workbook.sheet, config.workbook.column_map)
-        return parse_sheet(selection.grid, selection.header, config, today=today, log=log)
+        result = parse_sheet(selection.grid, selection.header, config, today=today, log=log)
+        if book.streaming:
+            result.warnings.append(
+                "read in streaming mode (very large file): hyperlinks and merged cells are unavailable"
+            )
+        return result
     finally:
         book.close()
 

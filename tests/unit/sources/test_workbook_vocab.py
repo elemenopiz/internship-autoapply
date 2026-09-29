@@ -56,6 +56,22 @@ def test_open_statuses(value: object) -> None:
 
 
 @pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("\U0001f7e2 Open", "open"),
+        ("\U0001f534 Closed", "closed"),
+        ("\u2705 Open", "open"),
+        ("\u274c Closed", "closed"),
+        ("Open \u2705", "open"),
+        ("\u2611", "open"),
+        ("\u2612", "closed"),
+    ],
+)
+def test_emoji_statuses(value: str, expected: str) -> None:
+    assert classify_status(value) == expected
+
+
+@pytest.mark.parametrize(
     "value",
     [
         "Closed",

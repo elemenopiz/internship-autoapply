@@ -113,6 +113,11 @@ def test_spec_alias_lists_are_covered() -> None:
         ("Description", "description"),
         ("Job Type", "type"),
         # typos
+        ("Last\nVerified", "verified"),  # a wrapped header cell
+        ("  LAST   VERIFIED  ", "verified"),
+        ("\u2705 Status", "status"),  # emoji decoration
+        ("\U0001f4c5 Last Verified", "verified"),
+        ("Link\u00a0", "url"),  # trailing non-breaking space
         ("Compnay", "company"),
         ("Locaton", "location"),
         ("Postion", "title"),

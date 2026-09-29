@@ -121,7 +121,7 @@ def test_the_sample_is_deterministic(tmp_path: Path) -> None:
 
 
 def test_builder_creates_missing_folders_and_accepts_str(tmp_path: Path) -> None:
-    target = tmp_path / "deep" / "er" / "Verified — sample (1).xlsx"
+    target = tmp_path / "deep" / "er" / "Verified \u2014 sample (1).xlsx"
     built = build_sample_workbook(str(target))
     assert target.is_file() and built.path == target
 

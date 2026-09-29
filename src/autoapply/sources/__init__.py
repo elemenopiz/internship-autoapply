@@ -28,6 +28,7 @@ from autoapply.sources.workbook import (
     WorkbookReport,
     detect_ats,
     inspect_workbook,
+    is_aggregator_url,
 )
 
 __all__ = [
@@ -41,6 +42,7 @@ __all__ = [
     "discover_providers",
     "ingest_all",
     "inspect_workbook",
+    "is_aggregator_url",
 ]
 
 _LOG = logging.getLogger("autoapply.sources")
@@ -89,7 +91,9 @@ class IngestResult:
         return not self.errors
 
     def fail(self, provider: str, message: str) -> None:
-        text = message if len(message) <= _MESSAGE_LIMIT else message[: _MESSAGE_LIMIT - 1] + "…"
+        text = (
+            message if len(message) <= _MESSAGE_LIMIT else message[: _MESSAGE_LIMIT - 1] + "\u2026"
+        )
         self.provider_errors[provider] = text
         self.errors.append(f"{provider}: {text}")
 
