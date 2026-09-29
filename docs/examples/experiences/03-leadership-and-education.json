@@ -1,0 +1,26 @@
+[
+  {
+    "id": "example-business-club-treasurer",
+    "kind": "leadership",
+    "title": "Treasurer",
+    "organization": "Example Business Club",
+    "location": "Austin, TX",
+    "start": "2025-01",
+    "end": "present",
+    "bullets": [
+      "Managed a $2,500 semester budget and reconciled every expense in a shared spreadsheet",
+      "Grew paid membership from 40 to 65 students by redesigning the dues process"
+    ],
+    "skills": ["Excel"]
+  },
+  {
+    "id": "example-university-degree",
+    "kind": "education",
+    "title": "Bachelor of Business Administration",
+    "organization": "Example State University",
+    "location": "Austin, TX",
+    "start": "2024-08",
+    "end": "2028-05",
+    "bullets": ["Relevant coursework: Statistics, Operations Management, Database Systems"]
+  }
+]
